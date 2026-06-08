@@ -14,6 +14,4 @@ class TripadvisorJobItem(scrapy.Item):
     address = scrapy.Field()
     district = scrapy.Field()
     city = scrapy.Field()
-    cuisines = scrapy.Field()
-    price_range = scrapy.Field()
     reviews = scrapy.Field()

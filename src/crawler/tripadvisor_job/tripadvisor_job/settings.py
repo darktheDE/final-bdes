@@ -98,7 +98,10 @@ FEED_EXPORT_ENCODING = "utf-8"
 TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 
 PLAYWRIGHT_LAUNCH_OPTIONS = {
+    "headless": False,
     "args": [
         "--disable-blink-features=AutomationControlled",
     ]
 }
+
+DOWNLOAD_TIMEOUT = 120

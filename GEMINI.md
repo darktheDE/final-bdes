@@ -55,8 +55,6 @@ Ensure any code dealing with database interactions or MapReduce analytics maps e
   "address": "123 Nguyen Trai, District 1, HCMC",
   "district": "District 1",
   "city": "HCMC",
-  "cuisines": ["Vietnamese", "Soup"],
-  "price_range": "$$ - $$$",
   "reviews": [
     {
       "user": "Alice",
