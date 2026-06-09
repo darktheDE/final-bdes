@@ -33,7 +33,7 @@
 Always place newly generated files or reference existing files using this exact map:
 - `bin/setup.bat`: One-click environment verification and automated binary setup (downloads `winutils.exe` and `hadoop.dll`).
 - `bin/run.bat`: Entry point script to set session variables, launch MongoDB/HDFS, run pipelines, and start Streamlit.
-- `src/crawler/`: Scraping scripts (`scrape_tripadvisor.py`, `fetch_mealdb.py`).
+- `src/crawler/`: Scraping scripts (`tripadvisor_job/` Scrapy spider, `fetch_mealdb.py`).
 - `src/crawler/seed/`: Offline backup files for local development.
 - `src/ingest/`: MongoDB-to-HDFS data pipeline (`mongo_to_hdfs.py`).
 - `src/mapreduce/`: Contains the 8 independent MapReduce jobs (e.g., `mr_cuisine_count.py`).

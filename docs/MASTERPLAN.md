@@ -51,7 +51,7 @@ This Master Plan divides our Native Windows Big Data project into structured, in
   - File: `src/crawler/tripadvisor_job` (Scrapy Spider)
   - Implement parsing of restaurant profiles and user reviews.
   - Successfully extracted 1334 restaurants and 44,000+ reviews to `full_output.json` (acting as our primary local seed).
-- [ ] **Task 1.2: Implement TheMealDB API Parser**
+- [x] **Task 1.2: Implement TheMealDB API Parser**
   - File: `src/crawler/fetch_mealdb.py`
   - Fetch meal categories, regions, ingredients, and recipes. Include local JSON seed fallback.
 - [ ] **Task 1.3: Setup Database Schema & Data Cleaning**
