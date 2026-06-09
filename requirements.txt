@@ -1,7 +1,8 @@
 scrapy==2.16.0
-scrapy-playwright
-pymongo
-mrjob
-streamlit
-pandas
-plotly
+scrapy-playwright==0.0.46
+playwright-stealth==2.0.3
+pymongo==4.17.0
+mrjob==0.7.4
+streamlit==1.40.0
+pandas==2.2.0
+plotly==5.18.0
