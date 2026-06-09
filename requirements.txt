@@ -1,0 +1,7 @@
+scrapy==2.16.0
+scrapy-playwright
+pymongo
+mrjob
+streamlit
+pandas
+plotly

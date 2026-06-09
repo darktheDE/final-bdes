@@ -56,6 +56,7 @@ class TripadvisorSpider(CrawlSpider):
         if 'restaurant_item' in response.meta:
             item = response.meta['restaurant_item']
             reviews = item['reviews']
+            total_reviews = response.meta.get('total_reviews', 0)
         else:
             item = TripadvisorJobItem()
             item['_id'] = response.url
@@ -70,6 +71,15 @@ class TripadvisorSpider(CrawlSpider):
             if not review_count:
                 review_count = response.css('#REVIEWS > div > div.WMQVi > div > div > div.wtCeG.f > div.egVMo > div > div.qymjm > div.JbuXZ > div > div > div > div > div > span::text').get()
             item['review_count'] = review_count
+
+            # Parse total reviews to prevent infinite pagination loops
+            total_reviews = 0
+            raw_count = item.get('review_count')
+            if raw_count:
+                import re
+                digits = re.sub(r'\D', '', str(raw_count))
+                if digits:
+                    total_reviews = int(digits)
 
             address = response.xpath('//*[@id="lithium-root"]/main/div/div/div[3]/div[1]/div[1]/div[1]/div[2]/div[2]/button/span/text()').get()
             item['address'] = address
@@ -133,21 +143,23 @@ class TripadvisorSpider(CrawlSpider):
                 next_offset = 15
                 next_url = current_url.replace('-Reviews-', '-Reviews-or15-')
                 
-            # Limiting to 3 pages (45 reviews) for this test run so you don't wait forever.
-            # You can remove this `if next_offset <= 30:` check later for the full scrape!
-            if next_offset <= 30:
+            # Stop mathematically if we've requested an offset beyond the total review count
+            # or if we've hit the representative sample limit (max 5 pages / 75 reviews per restaurant)
+            MAX_REVIEWS = 75
+            if (total_reviews > 0 and next_offset >= total_reviews) or next_offset >= MAX_REVIEWS:
+                yield item
+            else:
                 yield response.follow(
                     next_url, 
                     callback=self.parse_restaurant, 
                     meta={
                         'playwright': True, 
                         'restaurant_item': item,
+                        'total_reviews': total_reviews,
                         'playwright_page_methods': [
                             PageMethod('wait_for_selector', '#lithium-root', timeout=120000)
                         ]
                     }
                 )
-            else:
-                yield item
         else:
             yield item
