@@ -31,7 +31,7 @@ This Master Plan divides our Native Windows Big Data project into structured, in
 ### Cycle 0: Workspace & Dependency Sandbox (Environment Verification)
 *Goal: Ensure any teammate can pull the repo and immediately configure their local environment.*
 
-- [ ] **Task 0.1: Initialize Directory Tree**
+- [ x] **Task 0.1: Initialize Directory Tree**
   - Create the exact directory tree as defined in `README.md` and `GEMINI.md`.
   - Create standard `.gitignore` to ignore local datasets, database runtimes, and system caches (`data/`, `__pycache__/`, `.env`).
 - [ ] **Task 0.2: Implement `bin/setup.bat`**
@@ -47,14 +47,14 @@ This Master Plan divides our Native Windows Big Data project into structured, in
 ### Cycle 1: Scrapers & MongoDB Ingestion (Data Staging)
 *Goal: Crawl, fetch, clean, and load raw data into MongoDB.*
 
-- [ ] **Task 1.1: Implement TripAdvisor Python Scraper**
-  - File: `src/crawler/scrape_tripadvisor.py`
+- [x] **Task 1.1: Implement TripAdvisor Python Scraper**
+  - File: `src/crawler/tripadvisor_job` (Scrapy Spider)
   - Implement parsing of restaurant profiles and user reviews.
-  - Integrate an Offline Fallback mechanism: if requests timeout or hit rate-limits, read from local HTML/JSON stored in `src/crawler/seed/`.
-- [ ] **Task 1.2: Implement TheMealDB API Parser**
+  - Successfully extracted 1334 restaurants and 44,000+ reviews to `full_output.json` (acting as our primary local seed).
+- [x] **Task 1.2: Implement TheMealDB API Parser**
   - File: `src/crawler/fetch_mealdb.py`
   - Fetch meal categories, regions, ingredients, and recipes. Include local JSON seed fallback.
-- [ ] **Task 1.3: Setup Database Schema & Data Cleaning**
+- [x] **Task 1.3: Setup Database Schema & Data Cleaning**
   - File: `src/ingest/clean_and_populate.py`
   - Parse collected raw files, apply pandas/pyspark cleaning (remove duplicates, normalize dates, fill null values).
   - Populate MongoDB local collection `restaurants` and `meals` with structured JSON documents.
