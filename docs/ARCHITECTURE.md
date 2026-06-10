@@ -1,7 +1,7 @@
 # System Architecture & Data Blueprint
 ## Food & Restaurant Sentiment Analysis System (Ubuntu 24.04 WSL2)
 
-This document outlines the system architecture, component interactions, data pipeline flow, and precise database schemas. Both human developers and the Gemini AI Agent must align with this architectural blueprint during implementation.
+This document outlines the system architecture, component interactions, data pipeline flow, and precise database schemas. Both human developers and the Gemini AI Agent must align with this architectural blueprint.
 
 ---
 
@@ -10,40 +10,34 @@ This document outlines the system architecture, component interactions, data pip
 The system is built as a lightweight, modular Big Data pipeline designed to run natively on Ubuntu 24.04 LTS within a Windows Subsystem for Linux (WSL2) sandbox.
 
 ```text
-+-------------------------------------------------------------+
-|                     1. DATA SOURCE LAYER                    |
-|  - TripAdvisor Restaurants (Crawl via requests/bs4)          |
-|  - TheMealDB Cuisine Recipes (Fetch via REST API)           |
-|  + Multi-source requirement met (BeautifulSoup & API)       |
-+-------------------------------------------------------------+
-                               | (Python Crawler with Seed Fallback)
-                               v
-+-------------------------------------------------------------+
-|                     2. STAGING DATA LAYER                   |
-|  - MongoDB Community Server 8.0 LTS (NoSQL on port 27017)   |
-|  - Operations: CRUD, local staging, schema normalization     |
-+-------------------------------------------------------------+
-                               | (Sync Script: JSON Lines / .jsonl)
-                               v
-+-------------------------------------------------------------+
-|                     3. BIG DATA STORAGE LAYER               |
-|  - Hadoop Distributed File System (HDFS on port 9000)       |
-|  - Runs native on WSL2 environment (no winutils.exe needed)  |
-+-------------------------------------------------------------+
-                               | (Python mrjob / Hadoop Streaming)
-                               v
-+-------------------------------------------------------------+
-|                     4. DISTRIBUTED ANALYTICS                |
-|  - 8 MapReduce Analytics Jobs executing on YARN/Hadoop      |
-|  - Processing outputs saved back into HDFS                  |
-+-------------------------------------------------------------+
-                               | (Query / Read Operations)
-                               v
-+-------------------------------------------------------------+
-|                     5. PRESENTATION LAYER (GUI)             |
-|  - Streamlit Application (Local port 8501)                  |
-|  - Interactive CRUD Forms, Plotly Charts, Job Triggers      |
-+-------------------------------------------------------------+
+[ Ingestion Layer ]
+  - TripAdvisor Scraper (Python BeautifulSoup)
+  - TheMealDB API Client (HTTP Requests)
+         |
+         v
+[ Staging & OLTP Layer ]
+  - MongoDB (NoSQL)  --> Stores raw unstructured reviews (nested reviews array)
+  - MySQL (Relational) -> Stores cleaned structured tables (restaurants, reviews, meals)
+         |               + -> Direct Streamlit SQL queries & CRUD Operations
+         v
+[ Big Data Synchronization ]
+  - Python Export scripts (or Apache Sqoop)
+  - Writes structured data to HDFS in JSON Lines (.jsonl) or CSV format
+         |
+         v
+[ Storage & processing (OLAP) ]
+  - HDFS (Port 9000) -> Central Data Lake
+  - YARN & Hadoop MapReduce (mrjob) -> Batch analytical job execution
+         |
+         v
+[ Data Warehouse Layer ]
+  - Apache Hive -> Maps processed output directories on HDFS into SQL tables
+         |
+         v
+[ Presentation Layer (GUI) ]
+  - Streamlit Application (Local port 8501)
+  - Direct relational CRUD & SQL reports via MySQL connection
+  - Big Data OLAP reporting via HiveQL / Apache Hive connection
 ```
 
 ---
@@ -57,70 +51,81 @@ The system is built as a lightweight, modular Big Data pipeline designed to run 
 - **Offline Fallback**: If network failures or rate-limits occur, a fallback router reads raw pre-saved text dumps inside `src/crawler/seed/`.
 - **Cleaning**: Raw strings are parsed, datatypes cast (ratings to Float, counts to Int), and normalized into Python dictionaries.
 
-### 2.2. NoSQL Staging Layer
-- Cleaned objects are ingested into a local MongoDB server using `pymongo`.
-- MongoDB acts as the primary Transactional Database (OLTP), handling everyday CRUD queries triggered by the Streamlit user interface.
+### 2.2. Staging & Transactional Layer (OLTP)
+To satisfy transactional requirements and support user interaction efficiently, a **Hybrid Database** approach is implemented:
+- **MongoDB (NoSQL Document Store)**: Acts as the storage engine for raw, highly nested data. Best suited for TripAdvisor records containing nested arrays of review logs.
+- **MySQL (Relational Database)**: Stores the cleaned and normalized datasets split into relational entities. Streamlit connects directly to MySQL using `mysql-connector-python` to perform fast **CRUD (Create, Read, Update, Delete)** operations. This avoids querying distributed systems like HDFS for single-record transactional operations.
 
 ### 2.3. Big Data Storage Layer (HDFS)
-- MongoDB is not optimal for MapReduce. Therefore, data is synchronized to HDFS.
+- For historical and large-scale analytics, structured tables from MySQL/MongoDB are exported and synchronized to HDFS.
 - **Data Export Format**: Documents are written to HDFS in **JSON Lines (`.jsonl`)** format. In this format, every single line in the text file represents exactly one valid, independent JSON object.
   - *Why?* Hadoop splits input data line-by-line. Standard JSON arrays break when split, whereas JSON Lines files are native to MapReduce streaming.
 - **HDFS File Paths**:
   - Raw Restaurants: `hdfs://localhost:9000/data/raw/restaurants.jsonl`
   - Raw Meals: `hdfs://localhost:9000/data/raw/meals.jsonl`
 
-### 2.4. MapReduce Processing Layer
+### 2.4. MapReduce Processing Layer (OLAP)
 - Jobs are written in Python using `mrjob`.
 - When triggered, `mrjob` packages the Python script, invokes the Hadoop Streaming JAR, loads the JSON Lines file from HDFS, processes keys/values, and outputs text files into the HDFS directory: `hdfs://localhost:9000/data/processed/mapreduce/`.
+
+### 2.5. Data Warehouse Layer
+- **Apache Hive** mounts the output directories generated by the MapReduce engine on HDFS and represents them as structured SQL tables. This allows the Streamlit frontend to execute SQL-like HiveQL queries instead of reading raw text files from HDFS directly, providing an industry-standard OLAP analytics reporting layer.
 
 ---
 
 ## 3. Database Schemas & Collections
 
-### 3.1. Collection: `restaurants`
+### 3.1. MongoDB Collection: `restaurants`
 Stored in MongoDB database `sentiment_db`, collection `restaurants`.
-
-| Field Name | Datatype | Example | Description |
-| :--- | :--- | :--- | :--- |
-| `_id` | String / ObjectId | `"restaurant_12345"` | Unique Identifier |
-| `name` | String | `"Pho Hung"` | Restaurant Name |
-| `rating` | Double (Float) | `4.5` | Average rating (1.0 to 5.0) |
-| `review_count` | Int32 (Integer) | `128` | Total number of reviews |
-| `address` | String | `"123 Nguyen Trai, D1"` | Exact physical address |
-| `district` | String | `"District 1"` | Standardized District name |
-| `city` | String | `"HCMC"` | Standardized City name |
-| `cuisines` | Array (Strings) | `["Vietnamese", "Soup"]` | Food genre labels |
-| `price_range` | String | `"$$ - $$$"` | Affordable tier category |
-| `reviews` | Array (Objects) | *See reviews sub-document below* | List of user feedback comments |
-
-**`reviews` Sub-Document Structure:**
 ```json
 {
-  "user": "Alice",
-  "rating": 5,
-  "comment": "Excellent Pho! Very authentic taste."
+  "_id": "restaurant_12345",
+  "name": "Pho",
+  "rating": 4.5,
+  "review_count": 128,
+  "address": "123 Nguyen Trai, District 1, HCMC",
+  "district": "District 1",
+  "city": "HCMC",
+  "reviews": [
+    {
+      "user": "Alice",
+      "rating": 5,
+      "comment": "Excellent Pho! The broth is very rich and authentic."
+    }
+  ]
 }
 ```
 
-### 3.2. Collection: `meals`
-Stored in MongoDB database `sentiment_db`, collection `meals`.
+### 3.2. MySQL Relational Database Schema
+Stored in MySQL database `food_sentiment_db`.
 
-| Field Name | Datatype | Example | Description |
+#### Table: `restaurants`
+| Field Name | Datatype | Constraints | Description |
 | :--- | :--- | :--- | :--- |
-| `_id` | String | `"meal_52772"` | Unique API Meal ID |
-| `name` | String | `"Pho"` | Standardized Dish Name |
-| `category` | String | `"Beef"` | Food Category |
-| `area` | String | `"Vietnamese"` | Origin country/region |
-| `instructions` | String | `"Boil bones for hours..."` | Recipe step-by-step |
-| `ingredients` | Array (Strings) | `["Beef", "Star Anise"]` | Core recipe ingredients |
+| `id` | VARCHAR(50) | Primary Key | Unique restaurant ID |
+| `name` | VARCHAR(100) | Not Null | Restaurant name |
+| `rating` | FLOAT | Default NULL | Rating score |
+| `review_count` | INT | Default 0 | Total reviews count |
+| `address` | VARCHAR(255) | Default NULL | Physical address |
+| `district` | VARCHAR(50) | Default "Unknown" | District location |
+| `city` | VARCHAR(50) | Default "Unknown" | City location |
+| `price_range` | VARCHAR(20) | Default NULL | Price tier category |
 
----
+#### Table: `reviews`
+| Field Name | Datatype | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | INT | Primary Key, Auto-Increment | Unique review ID |
+| `restaurant_id` | VARCHAR(50) | Foreign Key -> `restaurants(id)` | Associated restaurant |
+| `user` | VARCHAR(50) | Default "Anonymous" | Reviewer username |
+| `rating` | FLOAT | Default NULL | Reviewer rating |
+| `comment` | TEXT | Default NULL | User comment text |
 
-## 4. Integration & Control Flow
-
-### 4.1. Streamlit as the Controller
-The Streamlit GUI dashboard at `localhost:8501` (running inside WSL2, accessible from Windows host browser) acts as the command center:
-1.  **Direct Read/Write**: Modifies MongoDB directly using a persistent `pymongo.MongoClient` instance (providing instant CRUD feedback).
-2.  **DevOps Execution**: Triggers backups by running `mongodump` via Python's `subprocess` module.
-3.  **Big Data Sync**: Triggers the sync pipeline via a subprocess to run the staging-to-storage HDFS data flow.
-4.  **Analytics Invocation**: Triggers `mrjob` analytics. Streamlit runs the command `python src/mapreduce/mr_rating_by_district.py -r hadoop hdfs:///data/raw/restaurants.jsonl`, reads the standard output stream, and plots the calculated aggregates into Plotly graphs on the fly.
+#### Table: `meals`
+| Field Name | Datatype | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | VARCHAR(50) | Primary Key | Unique meal ID |
+| `name` | VARCHAR(100) | Not Null | Standardized meal name |
+| `category` | VARCHAR(50) | Default "Unknown" | Meal category |
+| `area` | VARCHAR(50) | Default "Unknown" | Origin region |
+| `instructions` | TEXT | Default NULL | Step-by-step instructions |
+| `ingredients` | TEXT | Default NULL | Ingredients array (comma-separated) |
