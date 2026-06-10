@@ -12,7 +12,7 @@ The system is built as a lightweight, modular Big Data pipeline designed to run 
 ```text
 +-------------------------------------------------------------+
 |                     1. DATA SOURCE LAYER                    |
-|  - TripAdvisor Restaurants (Crawl via requests/bs4)          |
+|  - TripAdvisor Restaurants (Crawl via scrapy-playwright)    |
 |  - TheMealDB Cuisine Recipes (Fetch via REST API)           |
 |  + Multi-source requirement met (BeautifulSoup & API)       |
 +-------------------------------------------------------------+
