@@ -1,12 +1,12 @@
 # Project Master Plan: Food & Restaurant Sentiment Analysis System
-## Roadmap, Modules, Cycles, and Tasks
+## Roadmap, Modules, Cycles, and Tasks (Ubuntu 24.04 WSL2 LTS)
 
-This Master Plan divides our Native Windows Big Data project into structured, incremental development cycles. Each cycle contains granular tasks with a clear "Definition of Done" (DoD). 
+This Master Plan divides our Ubuntu WSL2 Big Data project into structured, incremental development cycles. Each cycle contains granular tasks with a clear "Definition of Done" (DoD).
 
 ---
 
 ## Development Strategy
-1. **Incremental Execution**: One task must be fully completed, tested locally, and verified on Windows before moving to the next.
+1. **Incremental Execution**: One task must be fully completed, tested locally, and verified on WSL2/Ubuntu before moving to the next.
 2. **AI-Assisted Work**: Use GEMINI CLI along with `/memory` commands to load this context. Ask the agent to implement specific tasks using: `Implement Task X.Y from MASTERPLAN.md`.
 3. **Branching/State Tracking**: Update the `[ ]` checklist status to `[x]` as tasks are completed.
 
@@ -16,11 +16,11 @@ This Master Plan divides our Native Windows Big Data project into structured, in
 
 | Milestone | Target Scope | Expected Deliverables |
 | :--- | :--- | :--- |
-| **Cycle 0** | Workspace & Dependency Sandbox | `setup.bat`, `run.bat` shell, directory tree setup |
-| **Cycle 1** | Scrapers & MongoDB Ingestion | TripAdvisor scraper, API parser, raw database populated |
+| **Cycle 0** | Workspace & Dependency Sandbox | `bin/setup.sh`, `bin/run.sh` shell scripts, directory tree setup |
+| **Cycle 1** | Scrapers & MongoDB Ingestion | TripAdvisor scraper, API parser, raw database populated (MongoDB 8.0) |
 | **Cycle 2** | HDFS Sync Pipelines | Data migration script, HDFS data structures verified |
-| **Cycle 3** | Analytics & MapReduce | 8 Python MapReduce analytics jobs (`mrjob`) |
-| **Cycle 4** | DevOps, Backup & Recovery | Dump/Restore automation, system resilience scripts |
+| **Cycle 3** | Analytics & MapReduce | 8 Python MapReduce analytics jobs (`mrjob`) on Hadoop Streaming |
+| **Cycle 4** | DevOps, Backup & Recovery | Dump/Restore automation shell scripts, system resilience scripts |
 | **Cycle 5** | Streamlit Interactive GUI | Web Dashboard, 5+ plotly charts, full CRUD interface |
 | **Cycle 6** | Validation, Video & Delivery | End-to-end integration test, slide deck, demo video |
 
@@ -29,18 +29,17 @@ This Master Plan divides our Native Windows Big Data project into structured, in
 ## Detailed Cycles & Tasks
 
 ### Cycle 0: Workspace & Dependency Sandbox (Environment Verification)
-*Goal: Ensure any teammate can pull the repo and immediately configure their local environment.*
+*Goal: Ensure any teammate can pull the repo and immediately configure their local WSL2/Ubuntu environment.*
 
-- [ x] **Task 0.1: Initialize Directory Tree**
+- [x] **Task 0.1: Initialize Directory Tree**
   - Create the exact directory tree as defined in `README.md` and `GEMINI.md`.
   - Create standard `.gitignore` to ignore local datasets, database runtimes, and system caches (`data/`, `__pycache__/`, `.env`).
-- [ ] **Task 0.2: Implement `bin/setup.bat`**
-  - Write a batch script to install Python dependencies from `requirements.txt`.
-  - Auto-download compatible versions of `winutils.exe` and `hadoop.dll` directly to a local project directory (`tools/`).
-  - Copy `hadoop.dll` to `C:\Windows\System32\` (or handle it locally).
-- [ ] **Task 0.3: Implement `bin/run.bat` (Skeleton Mode)**
-  - Write a batch script that sets up environment variables (`JAVA_HOME`, `HADOOP_HOME`) locally for the command session.
-  - Test and output these paths in the shell to verify path resolutions without global registry pollution.
+- [ ] **Task 0.2: Implement `bin/setup.sh`**
+  - Write a Bash script to install Python dependencies from `requirements.txt` inside a `venv` (Python 3.10/3.11).
+  - Verify if Hadoop configurations are correct and verify keyless SSH configurations are present.
+- [ ] **Task 0.3: Implement `bin/run.sh` (Skeleton Mode)**
+  - Write a Bash script that sets up Linux environment variables (`JAVA_HOME`, `HADOOP_HOME`, `PATH`) locally for the active shell session.
+  - Test and output these paths in the shell to verify path resolutions.
 
 ---
 
@@ -56,8 +55,8 @@ This Master Plan divides our Native Windows Big Data project into structured, in
   - Fetch meal categories, regions, ingredients, and recipes. Include local JSON seed fallback.
 - [x] **Task 1.3: Setup Database Schema & Data Cleaning**
   - File: `src/ingest/clean_and_populate.py`
-  - Parse collected raw files, apply pandas/pyspark cleaning (remove duplicates, normalize dates, fill null values).
-  - Populate MongoDB local collection `restaurants` and `meals` with structured JSON documents.
+  - Parse collected raw files, apply pandas cleaning (remove duplicates, normalize ratings and review counts, fill null values).
+  - Populate MongoDB local collections `restaurants` and `meals` under `sentiment_db` database.
 
 ---
 
@@ -66,10 +65,10 @@ This Master Plan divides our Native Windows Big Data project into structured, in
 
 - [ ] **Task 2.1: Create HDFS Sync Script**
   - File: `src/ingest/mongo_to_hdfs.py`
-  - Read data from MongoDB collections using PySpark or PyMongo.
-  - Write data to HDFS at `hdfs://localhost:9000/data/raw/` in CSV or JSON format.
+  - Read data from MongoDB collections using PyMongo.
+  - Write data to HDFS at `hdfs://localhost:9000/data/raw/` in JSON Lines (`.jsonl`) format.
 - [ ] **Task 2.2: Verify HDFS Integration**
-  - Expand `bin/run.bat` to automatically start HDFS namenode/datanode services and execute the sync script.
+  - Expand `bin/run.sh` to automatically start Hadoop DFS/YARN services using native scripts (`start-dfs.sh`, `start-yarn.sh`) and execute the sync script.
   - Validate output files using command line queries: `hdfs dfs -ls /data/raw/`.
 
 ---
@@ -86,7 +85,7 @@ This Master Plan divides our Native Windows Big Data project into structured, in
 - [ ] **Task 3.3: MapReduce Job 3 - Price Category Distribution**
   - File: `src/mapreduce/mr_price_segment.py`
   - Groups and counts restaurants into affordability tiers (Budget, Moderate, Luxury).
-- [ ] **Task 3.4: MapReduce Job 4 - Sentiment Sentiment Analysis**
+- [ ] **Task 3.4: MapReduce Job 4 - Sentiment Analysis**
   - File: `src/mapreduce/mr_sentiment_analysis.py`
   - Evaluates review comments using simple keyword matching (e.g., "delicious", "bad", "slow") to output positive vs. negative ratios per restaurant.
 - [ ] **Task 3.5: MapReduce Job 5 - Meal-to-Restaurant Ingredient Matching**
@@ -105,18 +104,18 @@ This Master Plan divides our Native Windows Big Data project into structured, in
 ---
 
 ### Cycle 4: DevOps, Backup & Resilience
-*Goal: Secure data pipelines with simple recovery commands.*
+*Goal: Secure data pipelines with simple recovery shell commands.*
 
 - [ ] **Task 4.1: Automate MongoDB Backup & Restore**
-  - File: `src/backup/db_backup.bat` / `src/backup/db_restore.bat`
+  - File: `src/backup/db_backup.sh` / `src/backup/db_restore.sh`
   - Write commands executing `mongodump` and `mongorestore` to keep database snapshots inside `/data/backups/`.
 - [ ] **Task 4.2: Add Health Checks in Start Scripts**
-  - Update `bin/run.bat` to detect if MongoDB port 27017 is already blocked by another process and gracefully alert the user.
+  - Update `bin/run.sh` to detect if MongoDB port 27017 or HDFS NameNode port 9000 is already blocked by another process and gracefully alert the user.
 
 ---
 
 ### Cycle 5: Interactive GUI (Streamlit Web Dashboard)
-*Goal: Build a beautiful, interactive frontend on Windows connecting to MongoDB and triggering HDFS/MapReduce.*
+*Goal: Build a beautiful, interactive frontend on WSL2 connecting to MongoDB and triggering HDFS/MapReduce.*
 
 - [ ] **Task 5.1: Build Streamlit Base Layout**
   - File: `src/streamlit_app/app.py`
@@ -140,12 +139,11 @@ This Master Plan divides our Native Windows Big Data project into structured, in
 *Goal: Finalize reports, slide decks, and record a high-quality video following HCMUTE standards.*
 
 - [ ] **Task 6.1: End-to-End Integration Testing**
-  - Clean the environment, pull the code onto another Windows machine, and run `bin/setup.bat` then `bin/run.bat` to verify zero-error execution.
+  - Clean the environment, pull the code onto another WSL2 Ubuntu instance, and run `bin/setup.sh` then `bin/run.sh` to verify zero-error execution.
 - [ ] **Task 6.2: Draft Slides & Document Report**
-  - Format the final report step-by-step (according to course templates).
+  - Format the final report step-by-step (according to course templates for Linux installation).
   - Draft slides (10–15 slides) covering Architecture, MapReduce, and Streamlit results.
 - [ ] **Task 6.3: Record and Edit Presentation Video**
   - Include HCMUTE IT Faculty Logo watermark throughout the video.
   - Record the voiceover/narration, add soft background music, and compile subtitles.
   - Ensure all team members introduce themselves on webcam at the start.
-```
