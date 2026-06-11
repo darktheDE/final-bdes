@@ -5,6 +5,7 @@ import time
 import string
 import requests
 from requests.exceptions import RequestException
+import pymongo
 
 # Paths (Windows Compatible)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -16,6 +17,10 @@ API_SEARCH_LETTER = "https://www.themealdb.com/api/json/v1/1/search.php?f={}"
 API_LIST_CATEGORIES = "https://www.themealdb.com/api/json/v1/1/list.php?c=list"
 API_LIST_AREAS = "https://www.themealdb.com/api/json/v1/1/list.php?a=list"
 API_LIST_INGREDIENTS = "https://www.themealdb.com/api/json/v1/1/list.php?i=list"
+
+# MongoDB Configuration
+MONGO_URI = "mongodb://localhost:27017/"
+DB_NAME = "sentiment_db"
 
 def parse_meal(raw_meal):
     """
@@ -154,6 +159,45 @@ def load_from_seed():
         print(f"[!] Failed to read seed file: {e}")
         return None, None, None, None
 
+def clean_meal(meal):
+    """Cleans a single meal document."""
+    if not meal.get('area'):
+        meal['area'] = "Unknown"
+    if not meal.get('category'):
+        meal['category'] = "Unknown"
+        
+    raw_ingredients = meal.get('ingredients', [])
+    clean_ingredients = [str(i).strip() for i in raw_ingredients if i and str(i).strip()]
+    meal['ingredients'] = clean_ingredients
+    
+    return meal
+
+def save_to_mongodb(meals_data):
+    """Cleans and upserts meals directly into MongoDB."""
+    if not meals_data:
+        return
+        
+    print(f"\n[*] Connecting to MongoDB at {MONGO_URI}...")
+    try:
+        client = pymongo.MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+        client.admin.command('ping')
+        db = client[DB_NAME]
+        meals_coll = db['meals']
+        
+        upsert_count = 0
+        for raw_meal in meals_data:
+            cleaned = clean_meal(raw_meal)
+            meals_coll.update_one(
+                {'_id': cleaned['_id']},
+                {'$set': cleaned},
+                upsert=True
+            )
+            upsert_count += 1
+            
+        print(f"[*] Successfully upserted {upsert_count} meals into MongoDB!")
+    except Exception as e:
+        print(f"[!] FAILED to save to MongoDB: {e}")
+
 def main():
     print("=== TheMealDB Ingestion Script ===")
     meals_data, categories, areas, ingredients = None, None, None, None
@@ -185,8 +229,8 @@ def main():
     if areas: print(f"    Total Areas: {len(areas)}")
     if ingredients: print(f"    Total Ingredients: {len(ingredients)}")
     
-    # Optional: Save to a final output location if needed, 
-    # but for now seed/meals.json acts as the master record.
+    # 4. Save directly to MongoDB
+    save_to_mongodb(meals_data)
 
 if __name__ == "__main__":
     main()
