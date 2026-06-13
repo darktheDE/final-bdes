@@ -77,14 +77,55 @@ food-sentiment-bigdata/
 
 ---
 
-## 4. Yêu cầu hệ thống tối thiểu (Máy Teammate)
+## 4. Yêu cầu hệ thống tối thiểu & Cài đặt dịch vụ (Máy Teammate)
 
-Để khởi chạy toàn bộ pipeline mượt mà trên môi trường Ubuntu 24.04 WSL2, máy tính của thành viên cần cài đặt sẵn:
-1.  **Windows 10/11** có cài đặt sẵn **WSL2** chạy phân phối **Ubuntu 24.04 LTS**.
-2.  **Java OpenJDK 11 LTS** (Khuyên dùng để Hadoop runtime tương thích tối đa).
-3.  **Apache Hadoop 3.3.6 LTS** (Đã cấu hình Single-Node Cluster trên Linux).
-4.  **MySQL Server 8.0** & **MongoDB Community Server 8.0 LTS** (Khởi chạy service trên WSL2).
-5.  **Python 3.10 hoặc 3.11** (Sử dụng virtual environment `venv` để tránh lỗi loại bỏ module `distutils` của Python 3.12 mặc định trên Ubuntu 24.04).
+Để khởi chạy toàn bộ pipeline mượt mà trên môi trường Ubuntu 24.04/26.04 WSL2, máy tính của thành viên cần cấu hình sẵn các dịch vụ sau trong phân phối **Ubuntu**:
+
+### 1. Phân phối hệ điều hành
+* **Windows 10/11** có cài đặt **WSL2** và chạy phân phối **Ubuntu** (Lưu ý: chuyển phân phối mặc định của WSL về Ubuntu nếu cần: `wsl -s Ubuntu`).
+
+### 2. Cài đặt Python 3.10 hoặc 3.11 & Java 11
+Sử dụng virtual environment `venv` để tránh lỗi do thiếu `distutils` trên Python 3.12+:
+```bash
+sudo apt update
+sudo apt install python3.10 python3.10-venv python3.10-dev openjdk-11-jdk -y
+```
+
+### 3. Cài đặt và cấu hình MySQL Server
+```bash
+# Cài đặt MySQL
+sudo apt install mysql-server -y
+sudo service mysql start
+
+# Cấu hình tài khoản root cho phép kết nối từ script Python (host localhost & 127.0.0.1)
+sudo mysql -u root -e "
+CREATE USER IF NOT EXISTS 'root'@'127.0.0.1' IDENTIFIED BY '';
+ALTER USER 'root'@'127.0.0.1' IDENTIFIED BY '';
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'127.0.0.1' WITH GRANT OPTION;
+ALTER USER 'root'@'localhost' IDENTIFIED BY '';
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' WITH GRANT OPTION;
+FLUSH PRIVILEGES;"
+
+# Khởi động lại dịch vụ
+sudo service mysql restart
+```
+
+### 4. Cài đặt và cấu hình MongoDB Server (Community Edition)
+```bash
+# Thêm MongoDB GPG key và repository
+sudo apt-get install gnupg curl -y
+curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | sudo gpg -o /usr/share/keyrings/mongodb-server-8.0.gpg --dearmor
+echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu noble/mongodb-org/8.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
+
+# Cài đặt và khởi chạy MongoDB
+sudo apt update
+sudo apt install -y mongodb-org
+sudo service mongod start
+```
+
+### 5. Cài đặt Apache Hadoop 3.3.6 LTS
+* Tải và giải nén Apache Hadoop 3.3.6 LTS vào thư mục `/usr/local/hadoop` và cấu hình Single-Node Cluster trên Linux.
+
 
 ---
 

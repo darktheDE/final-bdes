@@ -59,13 +59,31 @@ This guide compiles common errors encountered when running Hadoop, HDFS, YARN, M
     Then restart WSL2 in Windows PowerShell: `wsl --shutdown`.
 
 ### Issue 2.2: MySQL Access Denied for root user
-- **Symptoms**: Streamlit throws `Access denied for user 'root'@'localhost'` error when trying to connect.
-- **Cause**: MySQL on Ubuntu restricts root login to root OS users using auth_socket plugin.
-- **Solution**: Set standard password authentication for the database root or create a dedicated user:
-  ```sql
-  ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'your_password';
-  FLUSH PRIVILEGES;
-  ```
+- **Symptoms**: Setup script or Streamlit throws `Access denied for user 'root'@'localhost'` (Error 1698) or similar connection errors.
+- **Cause**: MySQL on Ubuntu restricts root login to root OS users using the `auth_socket` plugin, and handles connection host profiles `localhost` (Unix socket) and `127.0.0.1` (TCP/IP) separately. Additionally, newer MySQL versions (8.4+) disable the old `mysql_native_password` plugin by default.
+- **Solution**: 
+  1. Open the MySQL console with superuser privileges:
+     ```bash
+     sudo mysql -u root
+     ```
+  2. Execute the following SQL queries to create/alter root users to authenticate with empty passwords using the default authentication (or `caching_sha2_password`):
+     ```sql
+     -- Setup for TCP/IP connection (127.0.0.1)
+     CREATE USER IF NOT EXISTS 'root'@'127.0.0.1' IDENTIFIED BY '';
+     ALTER USER 'root'@'127.0.0.1' IDENTIFIED BY '';
+     GRANT ALL PRIVILEGES ON *.* TO 'root'@'127.0.0.1' WITH GRANT OPTION;
+
+     -- Setup for Unix socket connection (localhost)
+     ALTER USER 'root'@'localhost' IDENTIFIED BY '';
+     GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' WITH GRANT OPTION;
+
+     FLUSH PRIVILEGES;
+     EXIT;
+     ```
+  3. Restart the MySQL service:
+     ```bash
+     sudo service mysql restart
+     ```
 
 ---
 
