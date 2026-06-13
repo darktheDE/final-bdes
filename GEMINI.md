@@ -1,7 +1,16 @@
 # Project: Food & Restaurant Sentiment Analysis System (Ubuntu 24.04 WSL2 LTS Big Data Stack)
 
-## General Instructions
+## General Instructions & Environment Prerequisite Constraints
 
+- **Ubuntu 24.04 WSL2 Clean Environment**: The system is assumed to run on a clean Ubuntu 24.04 LTS installation inside WSL2. **No services are pre-installed.**
+- **Service Installation Restriction**:
+  - The setup script `bin/setup.sh` **MUST NOT** install system-wide database or big data services (MySQL, MongoDB, Hadoop, Hive, Java).
+  - The developer/user must install these services manually.
+  - `bin/setup.sh` is strictly limited to:
+    1. Verifying if basic command line utilities are present (python3, pip3, java).
+    2. Creating the Python virtual environment (`venv`).
+    3. Installing Python dependencies from `requirements.txt`.
+    4. Running database schema initialization (`src/ingest/init_db.py`) **only if** MySQL/MongoDB services are running. If they are not running, print a clear diagnostic warning and exit gracefully without crashing.
 - **Ubuntu 24.04 WSL2 Compatibility**: All generated scripts and configurations must run natively on Ubuntu 24.04 LTS inside WSL2.
   - Never write Windows Batch scripts (`.bat`) for active Linux executions. Use Linux Bash scripts (`.sh`) or Python.
   - Paths must follow POSIX standards (e.g., `/usr/local/hadoop`, `./src/crawler/seed/`). Never use backslashes (`\`) for Linux paths.
@@ -9,6 +18,33 @@
 - **Python-Only MapReduce**: All MapReduce code must be written in Python using the `mrjob` library executing via Hadoop Streaming.
 - **Robust Ingestion & Fallbacks**: Scraping and API ingestion modules must be offline-tolerant. Always implement a `try-except` fallback block to read from local seed data inside `src/crawler/seed/` if network requests fail or hit rate-limits (HTTP 403/429).
 - **Environment Safety**: Set environment variables (such as `JAVA_HOME`, `HADOOP_HOME`, `PATH`) dynamically in the active shell or `.bashrc`. Do not pollute global WSL2 environments unnecessarily.
+
+---
+
+## Technical Stack & Version Specifications
+
+To avoid runtime compatibility issues, both developer and AI Agent must strictly align with the following component versions:
+- **Java Platform**: OpenJDK 11 LTS (Required for Apache Hadoop compatibility)
+- **Hadoop Ecosystem**: Apache Hadoop 3.3.6 LTS (Configured in pseudo-distributed mode)
+- **Data Warehouse**: Apache Hive 3.1.3 (Configured to map HDFS directories)
+- **NoSQL Database**: MongoDB Community Server 8.0 LTS
+- **Relational Database**: MySQL Server 8.0
+- **Python Language**: Python 3.10 / 3.11 (Configured via `venv` virtual environment to prevent `distutils` import errors)
+- **Web Application**: Streamlit 1.35.0 (Running on host port 8501)
+- **Scraping Framework**: Scrapy 2.11.0 / BeautifulSoup4 4.12.0
+
+---
+
+## AI Agent Collaboration Workflow & Guidelines
+
+When implementing any task in this repository, the AI Agent must follow these step-by-step guidelines:
+1. **Read Prerequisites & Documentation**:
+   - Before executing code modifications, read the relevant files in `docs/` (e.g., `docs/REQUIREMENTS.md` for grading criteria, `docs/ARCHITECTURE.md` for architecture flows, `docs/TROUBLESHOOTING.md` for quick diagnostics).
+2. **Strict Schema Compliance**:
+   - Ensure all data parsing, loading, and MapReduce jobs strictly comply with the database schemas listed below.
+3. **Incremental Testing**:
+   - For every script or feature, provide the exact test command (e.g. `python -m pytest` or raw execution verification).
+   - Test scripts using mock or seed data in `src/crawler/seed/` before asserting success.
 
 ---
 

@@ -5,7 +5,22 @@ This document outlines the system architecture, component interactions, data pip
 
 ---
 
-## 1. System Architecture Overview
+## 1. Technology Stack & Version Specifications
+
+To prevent compatibility issues and ensure reliable executions, the following specific versions are set as the project standard:
+
+* **Java Platform**: `OpenJDK 11 LTS` (Required for Apache Hadoop compatibility)
+* **Hadoop Ecosystem**: `Apache Hadoop 3.3.6 LTS` (Running in pseudo-distributed configuration)
+* **Data Warehouse**: `Apache Hive 3.1.3` (Utilized to map HDFS output directories to HiveQL tables)
+* **NoSQL Database**: `MongoDB Community Server 8.0 LTS` (Stores raw crawled TripAdvisor reviews)
+* **Relational Database**: `MySQL Server 8.0` (Stores cleaned schemas for transactional and Streamlit CRUD)
+* **Python Language**: `Python 3.10` / `Python 3.11` (Configured inside a virtual environment `venv` to prevent `distutils` package missing exceptions in Python 3.12+)
+* **Web UI Framework**: `Streamlit 1.35.0`
+- **Scraping Framework**: `Scrapy 2.11.0` / `BeautifulSoup4 4.12.0`
+
+---
+
+## 2. System Architecture Overview
 
 The system is built as a lightweight, modular Big Data pipeline designed to run natively on Ubuntu 24.04 LTS within a Windows Subsystem for Linux (WSL2) sandbox.
 
