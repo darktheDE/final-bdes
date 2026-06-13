@@ -32,7 +32,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
 ### Cycle 0: Base Services Infrastructure Setup (Manual Installation)
 *Goal: Manually download, install, and configure database and big data daemons on a clean Ubuntu 24.04 WSL2 environment.*
 
-- [ ] **Task 0.1: Configure SSH Server for Hadoop localhost Access**
+- [x] **Task 0.1: Configure SSH Server for Hadoop localhost Access**
   - **Step-by-Step**:
     1. Install OpenSSH server package: `sudo apt update && sudo apt install openssh-server -y`
     2. Start SSH daemon: `sudo service ssh start`
@@ -45,7 +45,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
     4. Test using: `ssh localhost`
   - **DoD**: Command `ssh localhost` executes successfully without prompting for password or passphrase.
 
-- [ ] **Task 0.2: Install Java Development Kit (JDK 11)**
+- [x] **Task 0.2: Install Java Development Kit (JDK 11)**
   - **Step-by-Step**:
     1. Install OpenJDK 11 JDK package: `sudo apt install openjdk-11-jdk -y`
     2. Add Java environment variable configuration to shell initialization profile:
@@ -56,7 +56,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
   - **Test Command**: `java -version`
   - **DoD**: Output prints OpenJDK version `11.x.x`.
 
-- [ ] **Task 0.3: Install and Configure MySQL Server 8.0**
+- [x] **Task 0.3: Install and Configure MySQL Server 8.0**
   - **Step-by-Step**:
     1. Install MySQL server: `sudo apt install mysql-server -y`
     2. Start MySQL daemon service: `sudo service mysql start`
@@ -70,7 +70,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
   - **Test Command**: `mysql -u root -proot -e "SHOW DATABASES;"`
   - **DoD**: Output contains `food_sentiment_db`.
 
-- [ ] **Task 0.4: Install MongoDB Community Server 8.0 LTS**
+- [x] **Task 0.4: Install MongoDB Community Server 8.0 LTS**
   - **Step-by-Step**:
     1. Import MongoDB 8.0 GPG key and repository lists:
        ```bash
@@ -84,7 +84,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
   - **Test Command**: `mongosh --eval "db.adminCommand('ping')"`
   - **DoD**: Command prints `ok: 1` verification JSON message.
 
-- [ ] **Task 0.5: Install and Configure Apache Hadoop 3.3.6**
+- [x] **Task 0.5: Install and Configure Apache Hadoop 3.3.6**
   - **Step-by-Step**:
     1. Download Apache Hadoop 3.3.6 tarball package and extract it to `/usr/local/hadoop`:
        ```bash
@@ -124,7 +124,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
   - **Test Command**: `jps`
   - **DoD**: Processes list includes NameNode, DataNode, SecondaryNameNode, ResourceManager, and NodeManager.
 
-- [ ] **Task 0.6: Install Apache Hive 3.1.3 & Connect MySQL Metastore**
+- [x] **Task 0.6: Install Apache Hive 3.1.3 & Connect MySQL Metastore**
   - **Step-by-Step**:
     1. Download Hive 3.1.3 and extract to `/usr/local/hive`:
        ```bash
@@ -143,6 +143,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
     5. Execute metastore schema setup: `schematool -dbType mysql -initSchema`
   - **Test Command**: `hive -e "show databases;"`
   - **DoD**: Execution prints output with `default` table name workspace context.
+
 
 ---
 
