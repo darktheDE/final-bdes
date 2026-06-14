@@ -17,7 +17,15 @@
   - When accessing directories shared between Windows and WSL2, map them correctly (e.g., `/mnt/d/Project/final-bdes/`).
 - **Python-Only MapReduce**: All MapReduce code must be written in Python using the `mrjob` library executing via Hadoop Streaming.
 - **Robust Ingestion & Fallbacks**: Scraping and API ingestion modules must be offline-tolerant. Always implement a `try-except` fallback block to read from local seed data inside `src/crawler/seed/` if network requests fail or hit rate-limits (HTTP 403/429).
+- **No Personal Identifiers**: Do not include any personal identifiers or usernames (e.g., `kienhung`, `kien_hung`) in scripts, configuration files, paths, or setup commands. All scripts and paths must be generic (e.g., using `$USER`, `$HOME`, or dynamic user detection) to ensure the pipeline runs out-of-the-box on multiple independent machines.
+- **Standard WSL2 Deployment & Testing Workflow**: Follow the step-by-step procedure defined in `SETUP_GUIDE.md` and verify the components using `TEST_PLAN.md` to guarantee a clean install and execution on any standalone WSL2 Ubuntu environment.
 - **Environment Safety**: Set environment variables (such as `JAVA_HOME`, `HADOOP_HOME`, `PATH`) dynamically in the active shell or `.bashrc`. Do not pollute global WSL2 environments unnecessarily.
+- **Infrastructure Logging & Reusability**:
+  - Keep a complete log of all installation, setup, configuration, and debugging processes to assist with report writing and make it simple to replicate the system on other environments.
+  - Consolidate all infrastructure installation steps (for Java, Hadoop, Hive, databases, etc.), environment variables, XML configuration files (Hadoop and Hive site XMLs), and dependency fixes (Guava mismatch, MySQL JDBC jar download) into a single unified Bash script: `bin/install_infra.sh`.
+  - Save execution history, configuration files, and troubleshooting steps in the task logs (`docs/process/`) to fulfill the course project requirements.
+- **Hive Java 8 Runtime Requirement**: Apache Hive 3.1.3 must run under **Java 8** (`/usr/lib/jvm/java-8-openjdk-amd64`) due to classloading incompatibilities on Java 11+. Hadoop's `hadoop-env.sh` must export `JAVA_HOME` conditionally (`export JAVA_HOME=${JAVA_HOME:-/usr/lib/jvm/java-11-openjdk-amd64}`) to preserve the Java 8 setting when Hive executes Hadoop commands.
+- **Dedicated Hive Metastore User**: Always configure a dedicated MySQL user (e.g., `hive` with password `hive`) with full privileges on the `hive_metastore` schema. Do not use passwordless `root` accounts for Hive Metastore connections to avoid authentication errors with Java JDBC drivers.
 
 ---
 
