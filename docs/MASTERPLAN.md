@@ -333,7 +333,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
 
 - **Prerequisite Reading**: [GEMINI.md](file:///d:/Project/final-bdes/GEMINI.md#technical-stack-and-version-specifications), [ARCHITECTURE.md](file:///d:/Project/final-bdes/docs/ARCHITECTURE.md#25-data-warehouse-layer)
 
-- [ ] **Task 6.1: Build Streamlit Base Layout**
+- [x] **Task 6.1: Build Streamlit Base Layout**
   - **File**: [app.py](file:///d:/Project/final-bdes/src/streamlit_app/app.py)
   - **Step-by-Step**:
     1. Create a multi-page sidebar layout (pages: Data Management/CRUD, Big Data Reports, Job Execution).
@@ -341,7 +341,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
   - **Test Command**: `streamlit run src/streamlit_app/app.py`
   - **DoD**: The application runs on port 8501 showing structured navigation tabs.
 
-- [ ] **Task 6.2: Create Full MySQL CRUD Interface**
+- [x] **Task 6.2: Create Full MySQL CRUD Interface**
   - **File**: [app.py](file:///d:/Project/final-bdes/src/streamlit_app/app.py)
   - **Step-by-Step**:
     1. Add forms to insert new restaurant listings into MySQL table `restaurants`.
@@ -349,7 +349,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
   - **Test Command**: Insert a test restaurant through the UI, edit its rating, and verify it updates in MySQL via terminal client.
   - **DoD**: Users can perform C, R, U, D operations directly on the screen with instant UI feedback.
 
-- [ ] **Task 6.3: Develop Visualization Page (6 Charts, 3 Types)**
+- [x] **Task 6.3: Develop Visualization Page (6 Charts, 3 Types)**
   - **File**: [app.py](file:///d:/Project/final-bdes/src/streamlit_app/app.py)
   - **Step-by-Step**:
     1. Fetch aggregated MapReduce results from Apache Hive tables.
@@ -360,7 +360,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
   - **Test Command**: Load the reports tab and verify charts render with mock data.
   - **DoD**: Screen renders exactly 6 interactive Plotly charts across 3 different visualization types.
 
-- [ ] **Task 6.4: DevOps Operations Triggers**
+- [x] **Task 6.4: DevOps Operations Triggers**
   - **File**: [app.py](file:///d:/Project/final-bdes/src/streamlit_app/app.py)
   - **Step-by-Step**:
     1. Add UI buttons to trigger `db_backup.sh` and execution of MapReduce scripts using `subprocess`.
