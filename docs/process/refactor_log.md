@@ -134,3 +134,40 @@ mysql -h 127.0.0.1 -u root food_sentiment_db -e "SELECT name, district_parsed, c
 ### Kiểm thử cục bộ (Local Testing)
 - Cập nhật file `test_local.py` để test `mr_rating_bucket.py` thay cho job bị xóa.
 - Cài đặt `mrjob` và chạy thành công trên Windows qua Python môi trường cục bộ. Toàn bộ 8 jobs đều trả về kết quả hợp lệ, xử lý sạch các field lỗi.
+
+---
+
+## Module 3: Ingest Pipeline Fix
+
+**Ngày thực hiện**: 2026-06-14
+**Mục tiêu**: Đảm bảo pipeline ingest data từ nguồn → MongoDB → MySQL → HDFS hoạt động đúng với schema mới.
+
+### Các thay đổi
+- **`import_tripadvisor.py`**: 
+  - Import và tái sử dụng các hàm chuẩn hóa (`_parse_review_count`, `_extract_district`, `_normalize_city`, v.v.) từ `init_db.py`.
+  - Cập nhật logic để định dạng lại các field trước khi đưa vào MongoDB.
+  - Sử dụng `_make_short_id` để de-duplicate dữ liệu dựa trên URL của nhà hàng.
+- **`mongo_to_hdfs.py`**:
+  - Thêm logic in ra sample fields cho record đầu tiên (bao gồm việc kiểm tra `district_parsed` và sự vắng mặt của `price_range`).
+  - Cải thiện log hiển thị trong lúc export sang HDFS.
+- **`mysql_to_hdfs.py`**:
+  - Thay vì dùng `SELECT * FROM restaurants`, chỉ định rõ các cột cần xuất (`id, name, rating, review_count, address, district, district_parsed, city`) để tránh trường hợp `price_range` vẫn còn tồn tại từ schema cũ.
+
+---
+
+## Module 4: Streamlit UI Refactor
+
+**Ngày thực hiện**: 2026-06-14
+**Mục tiêu**: Nâng cấp và sửa lỗi giao diện dashboard Streamlit để phản ánh đúng schema mới, an toàn hơn và loại bỏ mockup data giả.
+
+### Các thay đổi
+- **`app.py`**:
+  - **Data Management (CRUD)**: Bổ sung thanh tìm kiếm (theo ID, name, district) và phân trang. Xoá trường `price_range` khỏi các biểu mẫu thêm/sửa. Bổ sung nút **"Sync từ MongoDB"** dùng `subprocess` chạy `init_db.py` để incremental load data trực tiếp từ web.
+  - **Big Data Reports**: Thay đổi các chart cũ dựa trên `price_range` thành các biểu đồ mới (`view_rating_histogram`, `view_top_districts`). Xoá toàn bộ các hàm fallback tạo mockup data, thay vào đó hiển thị dữ liệu rỗng (`pd.DataFrame()`) nếu chế độ `offline` để tránh gây hiểu lầm số liệu.
+  - **DevOps & Jobs Execution**: Bọc lệnh gọi `db_backup.sh` vào `try/except` kết hợp `subprocess.run` để không gây sập (crash) ứng dụng Streamlit; Cập nhật danh sách MapReduce jobs (thay `mr_price_segment.py` bằng `mr_rating_bucket.py`) và sửa đường dẫn cấu hình `mrjob.conf` trỏ đúng vào thư mục `conf/`.
+  - **Database Connection**: Thêm cơ chế dự phòng mật khẩu (fallback) cho `mysql.connector`. Hệ thống sẽ thử kết nối với mật khẩu `""` trước, nếu thất bại do `Access denied` sẽ thử tiếp với mật khẩu `"root"` (giúp tương thích ngược khi user chưa chạy `install_infra.sh` mới).
+- **`hive_connector.py`**:
+  - Gỡ bỏ hằng số dictionary `_MOCK_DATA` cùng với hàm `_get_mock()`. Mọi xử lý offline hoặc lỗi timeout từ Hive sẽ đều trả về dictionary chứa DataFrame rỗng thay vì dữ liệu cứng.
+- **`init_db.py` (Hotfixes)**:
+  - Đồng bộ cơ chế dự phòng mật khẩu kết nối cơ sở dữ liệu (`""` -> `"root"`) giống như `app.py`.
+  - Nâng cấp regex trong hàm `_extract_district` nhằm trích xuất chính xác tên Quận ở nhiều định dạng đa dạng (tiền tố tiếng Việt, hậu tố tiếng Anh, v.v.).

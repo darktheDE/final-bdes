@@ -46,41 +46,54 @@ def _parse_review_count(value) -> int:
 
 
 def _extract_district(address_or_district: str) -> str:
-    """Extract district name from a raw address string.
-
-    TripAdvisor thực tế trả về 'district' là chuỗi địa chỉ đường phố đầy đủ,
-    VD: '18B/17 Đ. Nguyễn Thị Minh Khai Quận 1'.
-    Hàm này extract tên quận/huyện.
-
-    Examples:
-        '18B/17 Đ. Nguyễn Thị Minh Khai Quận 1'  -> 'Quận 1'
-        'Phường Bến Nghé, Quận 1'                  -> 'Quận 1'
-        'District 1, HCMC'                          -> 'District 1'
-        'Q. Bình Thạnh'                             -> 'Bình Thạnh'
-        'Quận Tân Bình'                             -> 'Quận Tân Bình'
-    """
+    """Extract district name from a raw address string."""
     if not address_or_district or str(address_or_district).strip().lower() in ('', 'null', 'none', 'unknown'):
         return 'Unknown'
-
+        
     s = str(address_or_district).strip()
+    
+    parts = [p.strip() for p in s.split(',')]
+    
+    for part in reversed(parts):
+        # Vietnamese prefix style
+        match = re.search(r'(?i)\b(Qu[aậ]n|Huy[eệ]n|Th[aà]nh\s+ph[oố]|Q\.)\s+(.+)', part)
+        if match:
+            prefix = match.group(1)
+            name = match.group(2).strip()
+            if prefix.lower() == 'q.':
+                prefix = 'Quận'
+            return f"{prefix.capitalize()} {name}".strip()
+            
+        # English suffix style
+        match = re.search(r'(?i)\b(.+)\s+District\b', part)
+        if match:
+            name = match.group(1).strip()
+            return f"{name} District"
+            
+        # English prefix style
+        match = re.search(r'(?i)\bDistrict\s+(.+)', part)
+        if match:
+            return f"District {match.group(1).strip()}"
 
-    # Pattern 1: Quận/Huyện/Thành phố + number or name (Vietnamese)
-    match = re.search(r'(Qu[aậ]n\s+\d+|Qu[aậ]n\s+[A-Za-zÀ-ỹ\s]+|Huy[eệ]n\s+[A-Za-zÀ-ỹ\s]+|Th[aà]nh\s+ph[oố]\s+[A-Za-zÀ-ỹ\s]+)', s, re.IGNORECASE)
+    # Global fallback if no commas helped
+    match = re.search(r'(?i)(Qu[aậ]n|Huy[eệ]n|Q\.|District)\s+([^,]+)', s)
     if match:
-        return match.group(1).strip()
-
-    # Pattern 2: Q. + name (abbreviated)
-    match = re.search(r'Q\.\s*([A-Za-zÀ-ỹ0-9\s]+)', s)
+        prefix = match.group(1)
+        name = match.group(2).strip()
+        if prefix.lower() == 'q.':
+            prefix = 'Quận'
+        if prefix.lower() == 'district':
+            return f"District {name}"
+        return f"{prefix.capitalize()} {name}"
+        
+    match = re.search(r'(?i)([^,]+?)\s+District', s)
     if match:
-        return f"Quận {match.group(1).strip()}"
+        name = match.group(1).strip()
+        words = name.split()
+        if len(words) > 3:
+            name = " ".join(words[-3:])
+        return f"{name} District"
 
-    # Pattern 3: English "District X"
-    match = re.search(r'District\s+(\d+|[A-Za-z\s]+)', s, re.IGNORECASE)
-    if match:
-        return f"District {match.group(1).strip()}"
-
-    # Fallback: return first meaningful token (not a street number)
-    # If nothing matched, return the raw value truncated
     if len(s) <= 50:
         return s
     return 'Unknown'
@@ -167,23 +180,31 @@ def _make_short_id(raw_id: str) -> str:
 
 def get_mysql_connection(create_db=False):
     """Establishes connection to MySQL. Optionally creates the database."""
-    try:
-        conn = mysql.connector.connect(**MYSQL_CONFIG)
-        cursor = conn.cursor()
-        if create_db:
-            cursor.execute(
-                f"CREATE DATABASE IF NOT EXISTS {MYSQL_DB_NAME} "
-                "CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-            )
-        cursor.close()
-        conn.close()
+    def _connect(config, create):
+        try:
+            conn = mysql.connector.connect(**config)
+            cursor = conn.cursor()
+            if create:
+                cursor.execute(
+                    f"CREATE DATABASE IF NOT EXISTS {MYSQL_DB_NAME} "
+                    "CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+                )
+            cursor.close()
+            conn.close()
 
-        config = MYSQL_CONFIG.copy()
-        config['database'] = MYSQL_DB_NAME
-        return mysql.connector.connect(**config)
-    except mysql.connector.Error as err:
-        print(f"[!] MySQL Connection Error: {err}")
-        sys.exit(1)
+            db_config = config.copy()
+            db_config['database'] = MYSQL_DB_NAME
+            return mysql.connector.connect(**db_config)
+        except mysql.connector.Error as err:
+            if err.errno == 1045 and config.get('password') == '':
+                # Fallback to 'root' password
+                fallback_config = config.copy()
+                fallback_config['password'] = 'root'
+                return _connect(fallback_config, create)
+            print(f"[!] MySQL Connection Error: {err}")
+            sys.exit(1)
+
+    return _connect(MYSQL_CONFIG, create_db)
 
 
 def create_tables(mysql_conn):

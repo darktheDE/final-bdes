@@ -48,14 +48,27 @@ st.markdown("""
 
 # Function to connect to MySQL (Streamlit runs inside WSL, MySQL on 127.0.0.1 TCP port 3306)
 def get_db_connection():
-    return mysql.connector.connect(
-        host="127.0.0.1",
-        port=3306,
-        user="root",
-        password="root",
-        database="food_sentiment_db",
-        use_pure=True        # Force pure-Python driver to avoid Unix socket fallback
-    )
+    try:
+        return mysql.connector.connect(
+            host="127.0.0.1",
+            port=3306,
+            user="root",
+            password="",
+            database="food_sentiment_db",
+            use_pure=True
+        )
+    except mysql.connector.Error as err:
+        if err.errno == 1045: # Access denied
+            # Fallback for when the user hasn't run the new install_infra.sh yet
+            return mysql.connector.connect(
+                host="127.0.0.1",
+                port=3306,
+                user="root",
+                password="root",
+                database="food_sentiment_db",
+                use_pure=True
+            )
+        raise
 
 def run_hive_query(query):
     """Run Hive query using subprocess and return a pandas DataFrame."""
@@ -106,16 +119,27 @@ def render_crud_page():
         return
 
     # Tabs for CRUD operations
-    tab_read, tab_insert, tab_update, tab_delete = st.tabs(["View Records", "Insert New", "Update Record", "Delete Record"])
+    tab_read, tab_insert, tab_update, tab_delete, tab_sync = st.tabs(["View Records", "Insert New", "Update Record", "Delete Record", "Incremental Load"])
     
     with tab_read:
         st.subheader("View Restaurants")
-        search_term = st.text_input("Search by Name or District:", "")
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            search_term = st.text_input("Search by ID, Name or District:", "")
+        with col2:
+            records_per_page = st.selectbox("Records per page", [10, 20, 50, 100], index=1)
+        
+        page_num = st.number_input("Page", min_value=1, value=1)
+        offset = (page_num - 1) * records_per_page
+        
         if st.button("Search"):
             if search_term:
-                cursor.execute("SELECT * FROM restaurants WHERE name LIKE %s OR district LIKE %s LIMIT 100", (f"%{search_term}%", f"%{search_term}%"))
+                cursor.execute(
+                    "SELECT * FROM restaurants WHERE id LIKE %s OR name LIKE %s OR district LIKE %s LIMIT %s OFFSET %s", 
+                    (f"%{search_term}%", f"%{search_term}%", f"%{search_term}%", records_per_page, offset)
+                )
             else:
-                cursor.execute("SELECT * FROM restaurants LIMIT 100")
+                cursor.execute("SELECT * FROM restaurants LIMIT %s OFFSET %s", (records_per_page, offset))
             
             rows = cursor.fetchall()
             df = pd.DataFrame(rows)
@@ -134,34 +158,67 @@ def render_crud_page():
             address = st.text_input("Address")
             district = st.text_input("District")
             city = st.text_input("City", value="HCMC")
-            price = st.selectbox("Price Range", ["Budget", "Moderate", "Luxury", "Unknown"])
             
             submit = st.form_submit_button("Insert Record")
             if submit:
                 try:
                     cursor.execute("""
-                        INSERT INTO restaurants (id, name, rating, review_count, address, district, city, price_range) 
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (r_id, name, rating, rev_count, address, district, city, price))
+                        INSERT INTO restaurants (id, name, rating, review_count, address, district, city) 
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """, (r_id, name, rating, rev_count, address, district, city))
                     conn.commit()
                     st.success(f"Restaurant '{name}' inserted successfully!")
                 except Exception as e:
                     st.error(f"Error: {e}")
 
     with tab_update:
-        st.subheader("Update Restaurant Rating")
+        st.subheader("Update Restaurant")
         with st.form("update_form"):
-            update_id = st.text_input("Restaurant ID to update")
-            new_rating = st.number_input("New Rating", min_value=0.0, max_value=5.0, value=0.0, step=0.1)
+            update_id = st.text_input("Restaurant ID to update (Required)")
+            st.caption("Leave other fields blank if you do not wish to update them.")
+            new_name = st.text_input("New Name")
+            new_rating = st.number_input("New Rating (0.0 to ignore)", min_value=0.0, max_value=5.0, value=0.0, step=0.1)
+            new_address = st.text_input("New Address")
+            new_district = st.text_input("New District")
+            new_city = st.text_input("New City")
             
             update_submit = st.form_submit_button("Update")
             if update_submit:
-                try:
-                    cursor.execute("UPDATE restaurants SET rating = %s WHERE id = %s", (new_rating, update_id))
-                    conn.commit()
-                    st.success(f"Updated rating for ID '{update_id}'.")
-                except Exception as e:
-                    st.error(f"Error: {e}")
+                if not update_id:
+                    st.error("Restaurant ID is required.")
+                else:
+                    try:
+                        updates = []
+                        params = []
+                        if new_name:
+                            updates.append("name = %s")
+                            params.append(new_name)
+                        if new_rating > 0:
+                            updates.append("rating = %s")
+                            params.append(new_rating)
+                        if new_address:
+                            updates.append("address = %s")
+                            params.append(new_address)
+                        if new_district:
+                            updates.append("district = %s")
+                            params.append(new_district)
+                        if new_city:
+                            updates.append("city = %s")
+                            params.append(new_city)
+                            
+                        if updates:
+                            query = f"UPDATE restaurants SET {', '.join(updates)} WHERE id = %s"
+                            params.append(update_id)
+                            cursor.execute(query, tuple(params))
+                            conn.commit()
+                            if cursor.rowcount > 0:
+                                st.success(f"Updated record for ID '{update_id}'.")
+                            else:
+                                st.warning(f"No record found with ID '{update_id}'.")
+                        else:
+                            st.info("No fields provided to update.")
+                    except Exception as e:
+                        st.error(f"Error: {e}")
 
     with tab_delete:
         st.subheader("Delete Restaurant")
@@ -175,47 +232,26 @@ def render_crud_page():
                     st.success(f"Deleted restaurant ID '{delete_id}'.")
                 except Exception as e:
                     st.error(f"Error: {e}")
+                    
+    with tab_sync:
+        st.subheader("Incremental Load")
+        st.write("Sync new crawled data from MongoDB to MySQL and update data structures.")
+        if st.button("Sync từ MongoDB"):
+            with st.spinner("Running init_db.py migration..."):
+                try:
+                    result = subprocess.run(["python", "src/ingest/init_db.py"], capture_output=True, text=True)
+                    if result.returncode == 0:
+                        st.success("Sync completed successfully!")
+                        st.code(result.stdout)
+                    else:
+                        st.error("Sync failed.")
+                        st.code(result.stderr)
+                except Exception as e:
+                    st.error(f"Execution error: {e}")
 
     conn.close()
 
-def _mock_dist():
-    return pd.DataFrame({
-        "district": ["Quận 1", "Quận 3", "Quận 5", "Bình Thạnh", "Quận 7"],
-        "avg_rating": [4.35, 4.28, 4.10, 4.20, 4.45],
-        "total_count": [312, 198, 87, 145, 203],
-    })
 
-def _mock_cuisine():
-    return pd.DataFrame({
-        "category": ["Seafood", "Chicken", "Beef", "Vegetarian", "Pork", "Pasta"],
-        "cnt": [85, 78, 65, 52, 47, 43],
-    })
-
-def _mock_price_seg():
-    return pd.DataFrame({
-        "price_range": ["Budget", "Moderate", "Luxury", "Unknown"],
-        "cnt": [487, 612, 158, 77],
-    })
-
-def _mock_sentiment_price():
-    return pd.DataFrame({
-        "price_range": ["Luxury", "Moderate", "Budget"],
-        "avg_sentiment": [4.52, 4.21, 3.95],
-        "review_count": [8423, 24156, 18934],
-    })
-
-def _mock_review_dist():
-    return pd.DataFrame({
-        "stars": [1, 2, 3, 4, 5],
-        "cnt": [612, 1478, 5834, 18920, 22450],
-    })
-
-def _mock_delivery():
-    return pd.DataFrame({
-        "service_type": ["Dine-in", "Delivery"],
-        "avg_rating": [4.22, 3.98],
-        "review_count": [41830, 7464],
-    })
 
 
 def render_reports_page():
@@ -241,7 +277,7 @@ def render_reports_page():
                 st.rerun()
     else:
         hive_mode = "offline"
-        st.info("⚪ **Offline Mode** — `hive_connector` module not loaded. Displaying pre-computed mock data.")
+        st.info("⚪ **Offline Mode** — `hive_connector` module not loaded. No data will be displayed.")
 
     st.divider()
 
@@ -262,20 +298,12 @@ def render_reports_page():
             if _HIVE_CONNECTOR_AVAILABLE and hive_mode != "offline":
                 data = batch_query_all_views()
             else:
-                # offline: use mock
-                data = {
-                    "view_rating_by_district": _mock_dist(),
-                    "view_cuisine_frequency": _mock_cuisine(),
-                    "view_price_segment": _mock_price_seg(),
-                    "view_sentiment_by_price": _mock_sentiment_price(),
-                    "view_review_distribution": _mock_review_dist(),
-                    "view_delivery_sentiment": _mock_delivery(),
-                }
+                data = {}
         st.session_state[cache_key] = data
     else:
         data = st.session_state[cache_key]
 
-    def get_df(view_key: str, mock_fn) -> pd.DataFrame:
+    def get_df(view_key: str) -> pd.DataFrame:
         df = data.get(view_key, pd.DataFrame())
         return df
 
@@ -285,7 +313,7 @@ def render_reports_page():
     with col1:
         # Chart 1 — Average Rating by District (Bar)
         st.subheader("1. Đánh giá trung bình theo Quận")
-        df_dist = get_df("view_rating_by_district", _mock_dist)
+        df_dist = get_df("view_rating_by_district")
         try:
             fig_bar1 = px.bar(
                 df_dist, x="district", y="avg_rating",
@@ -303,7 +331,7 @@ def render_reports_page():
 
         # Chart 2 — Cuisine Frequency (Donut)
         st.subheader("2. Phân bố ẩm thực (Donut)")
-        df_cuis = get_df("view_cuisine_frequency", _mock_cuisine)
+        df_cuis = get_df("view_cuisine_frequency")
         try:
             fig_pie1 = px.pie(
                 df_cuis, names="category", values="cnt",
@@ -317,7 +345,7 @@ def render_reports_page():
 
         # Chart 3 — Review Star Distribution (Line)
         st.subheader("3. Phân phối số sao đánh giá")
-        df_revs = get_df("view_review_distribution", _mock_review_dist)
+        df_revs = get_df("view_review_distribution")
         try:
             fig_line = px.line(
                 df_revs, x="stars", y="cnt",
@@ -331,40 +359,43 @@ def render_reports_page():
             st.error(f"Chart 3 render error: {e}")
 
     with col2:
-        # Chart 4 — Sentiment (avg rating) by Price Range (Bar)
-        st.subheader("4. Sentiment trung bình theo phân khúc giá")
-        df_sent = get_df("view_sentiment_by_price", _mock_sentiment_price)
+        # Chart 4 — Top Districts by Restaurant Count (Horizontal Bar)
+        st.subheader("4. Top Quận có nhiều nhà hàng nhất")
+        df_top = get_df("view_top_districts")
         try:
             fig_bar2 = px.bar(
-                df_sent, x="price_range", y="avg_sentiment",
-                title="Avg Sentiment Score by Price Segment",
-                color="price_range",
-                color_discrete_sequence=px.colors.qualitative.Vivid,
-                hover_data={"review_count": True, "avg_sentiment": ":.3f"},
-                text="avg_sentiment",
+                df_top, x="restaurant_count", y="district", orientation='h',
+                title="Top Districts by Restaurant Count",
+                color="restaurant_count",
+                color_continuous_scale="Viridis",
+                hover_data={"avg_rating": True, "restaurant_count": True},
+                text="restaurant_count",
             )
-            fig_bar2.update_traces(texttemplate="%{text:.2f}", textposition="outside")
+            fig_bar2.update_traces(texttemplate="%{text}", textposition="outside")
+            fig_bar2.update_layout(coloraxis_showscale=False, yaxis={'categoryorder':'total ascending'})
             st.plotly_chart(fig_bar2, use_container_width=True)
         except Exception as e:
             st.error(f"Chart 4 render error: {e}")
 
-        # Chart 5 — Price Segment Breakdown (Pie)
-        st.subheader("5. Phân khúc giá (Pie)")
-        df_price = get_df("view_price_segment", _mock_price_seg)
+        # Chart 5 — Rating Histogram Breakdown (Bar)
+        st.subheader("5. Phân bố nhà hàng theo nhóm sao")
+        df_hist = get_df("view_rating_histogram")
         try:
-            fig_pie2 = px.pie(
-                df_price, names="price_range", values="cnt",
-                title="Price Range Distribution",
-                color_discrete_sequence=px.colors.sequential.RdBu,
+            fig_bar_hist = px.bar(
+                df_hist, x="rating_group", y="restaurant_count",
+                title="Rating Histogram Distribution",
+                color="rating_group",
+                color_discrete_sequence=px.colors.qualitative.Pastel,
+                text="restaurant_count",
             )
-            fig_pie2.update_traces(textposition="inside", textinfo="percent+label")
-            st.plotly_chart(fig_pie2, use_container_width=True)
+            fig_bar_hist.update_traces(texttemplate="%{text}", textposition="outside")
+            st.plotly_chart(fig_bar_hist, use_container_width=True)
         except Exception as e:
             st.error(f"Chart 5 render error: {e}")
 
         # Chart 6 — Delivery vs Dine-in Sentiment (Scatter / Bubble)
         st.subheader("6. Delivery vs Dine-in — So sánh Sentiment")
-        df_del = get_df("view_delivery_sentiment", _mock_delivery)
+        df_del = get_df("view_delivery_sentiment")
         try:
             fig_scatter = px.scatter(
                 df_del,
@@ -389,17 +420,21 @@ def render_devops_page():
     if st.button("Run Backup Script (db_backup.sh)"):
         with st.spinner("Running backup..."):
             try:
-                result = subprocess.check_output(['bash', 'src/backup/db_backup.sh'], stderr=subprocess.STDOUT)
-                st.success("Backup Completed!")
-                st.code(result.decode('utf-8'))
+                result = subprocess.run(['bash', 'src/backup/db_backup.sh'], capture_output=True, text=True)
+                if result.returncode == 0:
+                    st.success("Backup Completed!")
+                    st.code(result.stdout)
+                else:
+                    st.error("Backup script failed.")
+                    st.code(result.stderr or result.stdout)
             except Exception as e:
-                st.error(f"Backup script failed or not found: {e}")
+                st.error(f"Backup script execution failed: {e}")
 
     st.subheader("2. Run MapReduce Analytical Jobs")
     job_choice = st.selectbox("Select Job to Run", [
         "mr_rating_by_district.py",
         "mr_cuisine_count.py",
-        "mr_price_segment.py",
+        "mr_rating_bucket.py",
         "mr_sentiment_analysis.py",
         "mr_ingredient_match.py",
         "mr_top_reviewed.py",
@@ -412,7 +447,7 @@ def render_devops_page():
             try:
                 # Run MapReduce job on Hadoop YARN
                 hdfs_base = "hdfs://localhost:9000/data/raw"
-                conf_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../mrjob.conf'))
+                conf_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../conf/mrjob.conf'))
                 if job_choice == 'mr_cuisine_count.py':
                     cmd = ['python', f'src/mapreduce/{job_choice}', '-r', 'hadoop', '--conf-path', conf_path, f'{hdfs_base}/meals/meals.jsonl']
                 elif job_choice == 'mr_ingredient_match.py':
