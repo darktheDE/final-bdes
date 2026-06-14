@@ -11,7 +11,7 @@ echo " Environment: Ubuntu 24.04 WSL2 LTS"
 echo "==================================================="
 
 # 1. Export environment variables
-export JAVA_HOME="/usr/lib/jvm/java-11-openjdk-amd64"
+export JAVA_HOME="/usr/lib/jvm/java-8-openjdk-amd64"
 export HADOOP_HOME="/usr/local/hadoop"
 export PATH="$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin"
 

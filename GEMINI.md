@@ -24,7 +24,7 @@
   - Keep a complete log of all installation, setup, configuration, and debugging processes to assist with report writing and make it simple to replicate the system on other environments.
   - Consolidate all infrastructure installation steps (for Java, Hadoop, Hive, databases, etc.), environment variables, XML configuration files (Hadoop and Hive site XMLs), and dependency fixes (Guava mismatch, MySQL JDBC jar download) into a single unified Bash script: `bin/install_infra.sh`.
   - Save execution history, configuration files, and troubleshooting steps in the task logs (`docs/process/`) to fulfill the course project requirements.
-- **Hive Java 8 Runtime Requirement**: Apache Hive 3.1.3 must run under **Java 8** (`/usr/lib/jvm/java-8-openjdk-amd64`) due to classloading incompatibilities on Java 11+. Hadoop's `hadoop-env.sh` must export `JAVA_HOME` conditionally (`export JAVA_HOME=${JAVA_HOME:-/usr/lib/jvm/java-11-openjdk-amd64}`) to preserve the Java 8 setting when Hive executes Hadoop commands.
+- **Unified Java 8 Runtime**: Apache Hadoop 3.3.6 and Apache Hive 3.1.3 must both strictly run under **Java 8** (`/usr/lib/jvm/java-8-openjdk-amd64`). This unified setup prevents Kryo serialization crashes (`NoSuchFieldException: parentOffset`) in Hive 3.x while executing MapReduce tasks.
 - **Dedicated Hive Metastore User**: Always configure a dedicated MySQL user (e.g., `hive` with password `hive`) with full privileges on the `hive_metastore` schema. Do not use passwordless `root` accounts for Hive Metastore connections to avoid authentication errors with Java JDBC drivers.
 
 ---
@@ -32,7 +32,7 @@
 ## Technical Stack & Version Specifications
 
 To avoid runtime compatibility issues, both developer and AI Agent must strictly align with the following component versions:
-- **Java Platform**: OpenJDK 11 LTS (Required for Apache Hadoop compatibility)
+- **Java Platform**: OpenJDK 8 LTS (Required for stable Apache Hive MapReduce compatibility)
 - **Hadoop Ecosystem**: Apache Hadoop 3.3.6 LTS (Configured in pseudo-distributed mode)
 - **Data Warehouse**: Apache Hive 3.1.3 (Configured to map HDFS directories)
 - **NoSQL Database**: MongoDB Community Server 8.0 LTS

@@ -6,6 +6,17 @@ import plotly.express as px
 import plotly.graph_objects as go
 import json
 import os
+import sys
+
+# Add streamlit_app directory to path so hive_connector resolves correctly
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    from hive_connector import (
+        query_hive, get_hive_status, reset_connection_cache, batch_query_all_views
+    )
+    _HIVE_CONNECTOR_AVAILABLE = True
+except ImportError:
+    _HIVE_CONNECTOR_AVAILABLE = False
 
 # Set page layout
 st.set_page_config(page_title="Food Sentiment Analysis", layout="wide", page_icon="🍲")
@@ -167,65 +178,208 @@ def render_crud_page():
 
     conn.close()
 
+def _mock_dist():
+    return pd.DataFrame({
+        "district": ["Quận 1", "Quận 3", "Quận 5", "Bình Thạnh", "Quận 7"],
+        "avg_rating": [4.35, 4.28, 4.10, 4.20, 4.45],
+        "total_count": [312, 198, 87, 145, 203],
+    })
+
+def _mock_cuisine():
+    return pd.DataFrame({
+        "category": ["Seafood", "Chicken", "Beef", "Vegetarian", "Pork", "Pasta"],
+        "cnt": [85, 78, 65, 52, 47, 43],
+    })
+
+def _mock_price_seg():
+    return pd.DataFrame({
+        "price_range": ["Budget", "Moderate", "Luxury", "Unknown"],
+        "cnt": [487, 612, 158, 77],
+    })
+
+def _mock_sentiment_price():
+    return pd.DataFrame({
+        "price_range": ["Luxury", "Moderate", "Budget"],
+        "avg_sentiment": [4.52, 4.21, 3.95],
+        "review_count": [8423, 24156, 18934],
+    })
+
+def _mock_review_dist():
+    return pd.DataFrame({
+        "stars": [1, 2, 3, 4, 5],
+        "cnt": [612, 1478, 5834, 18920, 22450],
+    })
+
+def _mock_delivery():
+    return pd.DataFrame({
+        "service_type": ["Dine-in", "Delivery"],
+        "avg_rating": [4.22, 3.98],
+        "review_count": [41830, 7464],
+    })
+
+
 def render_reports_page():
     st.title("📊 Big Data Reports")
-    st.write("Visualizations based on Hive OLAP data (processed via MapReduce).")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("1. Average Rating by District")
-        # For demonstration, use mock data if Hive is not set up
-        df_dist = pd.DataFrame({
-            "district": ["District 1", "District 2", "District 3", "District 4"],
-            "avg_rating": [4.2, 4.5, 3.8, 4.0]
-        })
-        fig_bar1 = px.bar(df_dist, x='district', y='avg_rating', title="Ratings per District", color='district')
-        st.plotly_chart(fig_bar1, use_container_width=True)
+    st.caption("OLAP analytics powered by Apache Hive — backed by Hadoop HDFS")
 
-        st.subheader("2. Cuisine Frequency (Donut)")
-        df_cuis = pd.DataFrame({
-            "cuisine": ["Vietnamese", "Japanese", "Italian", "American"],
-            "count": [120, 45, 30, 20]
-        })
-        fig_pie1 = px.pie(df_cuis, names='cuisine', values='count', hole=0.4, title="Cuisine Breakdown")
-        st.plotly_chart(fig_pie1, use_container_width=True)
-        
-        st.subheader("3. Reviews Distribution Curve")
-        df_revs = pd.DataFrame({
-            "stars": [1, 2, 3, 4, 5],
-            "reviews": [500, 1200, 3000, 8000, 15000]
-        })
-        fig_line = px.line(df_revs, x='stars', y='reviews', markers=True, title="Star Distribution")
-        st.plotly_chart(fig_line, use_container_width=True)
+    # ── Data source status banner ─────────────────────────────────────────────
+    if _HIVE_CONNECTOR_AVAILABLE:
+        with st.spinner("Detecting Hive connection..."):
+            hive_mode = get_hive_status()
+
+        col_status, col_refresh = st.columns([5, 1])
+        with col_status:
+            if hive_mode == "live":
+                st.success("🟢 **Live Hive Data** — Connected to HiveServer2 (port 10000). Charts show real-time HDFS data.")
+            elif hive_mode == "subprocess":
+                st.warning("🟡 **Hive CLI Mode** — HiveServer2 not running; using `hive -S -e` subprocess fallback. Data is live but slower.")
+            else:
+                st.info("⚪ **Offline Mode** — Hive not available. Charts display pre-computed representative data.")
+        with col_refresh:
+            if st.button("🔄 Re-probe", help="Force re-detect Hive connection mode"):
+                reset_connection_cache()
+                st.rerun()
+    else:
+        hive_mode = "offline"
+        st.info("⚪ **Offline Mode** — `hive_connector` module not loaded. Displaying pre-computed mock data.")
+
+    st.divider()
+
+    # ── Batch load all data once, cache in session_state ──────────────────────
+    # Key includes hive_mode so a mode change triggers a fresh fetch
+    cache_key = f"hive_data_{hive_mode}"
+
+    col_refresh_top, _ = st.columns([1, 5])
+    with col_refresh_top:
+        force_refresh = st.button(
+            "🔄 Refresh Data",
+            help="Re-query all Hive views (clears cached results)",
+            key="refresh_data_btn",
+        )
+
+    if force_refresh or cache_key not in st.session_state:
+        with st.spinner("⏳ Loading analytics data from Hive (this may take 1–2 minutes on first load)..."):
+            if _HIVE_CONNECTOR_AVAILABLE and hive_mode != "offline":
+                data = batch_query_all_views()
+            else:
+                # offline: use mock
+                data = {
+                    "view_rating_by_district": _mock_dist(),
+                    "view_cuisine_frequency": _mock_cuisine(),
+                    "view_price_segment": _mock_price_seg(),
+                    "view_sentiment_by_price": _mock_sentiment_price(),
+                    "view_review_distribution": _mock_review_dist(),
+                    "view_delivery_sentiment": _mock_delivery(),
+                }
+        st.session_state[cache_key] = data
+    else:
+        data = st.session_state[cache_key]
+
+    def get_df(view_key: str, mock_fn) -> pd.DataFrame:
+        df = data.get(view_key, pd.DataFrame())
+        return df
+
+    # ── Charts grid ───────────────────────────────────────────────────────────
+    col1, col2 = st.columns(2)
+
+    with col1:
+        # Chart 1 — Average Rating by District (Bar)
+        st.subheader("1. Đánh giá trung bình theo Quận")
+        df_dist = get_df("view_rating_by_district", _mock_dist)
+        try:
+            fig_bar1 = px.bar(
+                df_dist, x="district", y="avg_rating",
+                title="Ratings per District",
+                color="avg_rating",
+                color_continuous_scale="Oranges",
+                hover_data={"total_count": True, "avg_rating": ":.2f"},
+                text="avg_rating",
+            )
+            fig_bar1.update_traces(texttemplate="%{text:.2f}", textposition="outside")
+            fig_bar1.update_layout(coloraxis_showscale=False)
+            st.plotly_chart(fig_bar1, use_container_width=True)
+        except Exception as e:
+            st.error(f"Chart 1 render error: {e}")
+
+        # Chart 2 — Cuisine Frequency (Donut)
+        st.subheader("2. Phân bố ẩm thực (Donut)")
+        df_cuis = get_df("view_cuisine_frequency", _mock_cuisine)
+        try:
+            fig_pie1 = px.pie(
+                df_cuis, names="category", values="cnt",
+                hole=0.42, title="Cuisine Category Breakdown",
+                color_discrete_sequence=px.colors.qualitative.Bold,
+            )
+            fig_pie1.update_traces(textposition="inside", textinfo="percent+label")
+            st.plotly_chart(fig_pie1, use_container_width=True)
+        except Exception as e:
+            st.error(f"Chart 2 render error: {e}")
+
+        # Chart 3 — Review Star Distribution (Line)
+        st.subheader("3. Phân phối số sao đánh giá")
+        df_revs = get_df("view_review_distribution", _mock_review_dist)
+        try:
+            fig_line = px.line(
+                df_revs, x="stars", y="cnt",
+                markers=True, title="Star Rating Distribution Curve",
+                color_discrete_sequence=["#fca311"],
+            )
+            fig_line.update_traces(line_width=3, marker_size=9)
+            fig_line.update_xaxes(tickvals=[1, 2, 3, 4, 5])
+            st.plotly_chart(fig_line, use_container_width=True)
+        except Exception as e:
+            st.error(f"Chart 3 render error: {e}")
 
     with col2:
-        st.subheader("4. Sentiment by Category")
-        df_sent = pd.DataFrame({
-            "category": ["Budget", "Moderate", "Luxury"],
-            "sentiment_score": [0.65, 0.78, 0.88]
-        })
-        fig_bar2 = px.bar(df_sent, x='category', y='sentiment_score', title="Sentiment Score", color='category')
-        st.plotly_chart(fig_bar2, use_container_width=True)
-        
-        st.subheader("5. Price Segment Breakdown")
-        df_price = pd.DataFrame({
-            "segment": ["Budget", "Moderate", "Luxury"],
-            "count": [450, 600, 150]
-        })
-        fig_pie2 = px.pie(df_price, names='segment', values='count', title="Price Distribution")
-        st.plotly_chart(fig_pie2, use_container_width=True)
+        # Chart 4 — Sentiment (avg rating) by Price Range (Bar)
+        st.subheader("4. Sentiment trung bình theo phân khúc giá")
+        df_sent = get_df("view_sentiment_by_price", _mock_sentiment_price)
+        try:
+            fig_bar2 = px.bar(
+                df_sent, x="price_range", y="avg_sentiment",
+                title="Avg Sentiment Score by Price Segment",
+                color="price_range",
+                color_discrete_sequence=px.colors.qualitative.Vivid,
+                hover_data={"review_count": True, "avg_sentiment": ":.3f"},
+                text="avg_sentiment",
+            )
+            fig_bar2.update_traces(texttemplate="%{text:.2f}", textposition="outside")
+            st.plotly_chart(fig_bar2, use_container_width=True)
+        except Exception as e:
+            st.error(f"Chart 4 render error: {e}")
 
-        st.subheader("6. Delivery vs Non-Delivery Sentiment")
-        df_del = pd.DataFrame({
-            "type": ["Delivery", "Delivery", "Dine-in", "Dine-in"],
-            "x": [1, 2, 1, 2],
-            "sentiment": [0.7, 0.75, 0.8, 0.82]
-        })
-        fig_scatter = px.scatter(df_del, x='x', y='sentiment', color='type', size='sentiment', title="Delivery Sentiment Comparison")
-        st.plotly_chart(fig_scatter, use_container_width=True)
+        # Chart 5 — Price Segment Breakdown (Pie)
+        st.subheader("5. Phân khúc giá (Pie)")
+        df_price = get_df("view_price_segment", _mock_price_seg)
+        try:
+            fig_pie2 = px.pie(
+                df_price, names="price_range", values="cnt",
+                title="Price Range Distribution",
+                color_discrete_sequence=px.colors.sequential.RdBu,
+            )
+            fig_pie2.update_traces(textposition="inside", textinfo="percent+label")
+            st.plotly_chart(fig_pie2, use_container_width=True)
+        except Exception as e:
+            st.error(f"Chart 5 render error: {e}")
 
-    st.info("Note: The visualizations currently use mock datasets representing the expected MapReduce/Hive output.")
+        # Chart 6 — Delivery vs Dine-in Sentiment (Scatter / Bubble)
+        st.subheader("6. Delivery vs Dine-in — So sánh Sentiment")
+        df_del = get_df("view_delivery_sentiment", _mock_delivery)
+        try:
+            fig_scatter = px.scatter(
+                df_del,
+                x="service_type", y="avg_rating",
+                size="review_count", color="service_type",
+                title="Delivery vs Dine-in Sentiment Comparison",
+                color_discrete_sequence=["#fca311", "#14213d"],
+                hover_data={"review_count": True, "avg_rating": ":.3f"},
+                text="avg_rating",
+            )
+            fig_scatter.update_traces(texttemplate="%{text:.2f}", textposition="top center")
+            fig_scatter.update_yaxes(range=[3.5, 5.0])
+            st.plotly_chart(fig_scatter, use_container_width=True)
+        except Exception as e:
+            st.error(f"Chart 6 render error: {e}")
 
 def render_devops_page():
     st.title("⚙️ DevOps & Jobs Execution")
@@ -253,10 +407,11 @@ def render_devops_page():
             try:
                 # Run MapReduce job on Hadoop YARN
                 hdfs_base = "hdfs://localhost:9000/data/raw"
+                conf_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../mrjob.conf'))
                 if job_choice == 'mr_cuisine_count.py':
-                    cmd = ['python', f'src/mapreduce/{job_choice}', '-r', 'hadoop', f'{hdfs_base}/meals/meals.jsonl']
+                    cmd = ['python', f'src/mapreduce/{job_choice}', '-r', 'hadoop', '--conf-path', conf_path, f'{hdfs_base}/meals/meals.jsonl']
                 else:
-                    cmd = ['python', f'src/mapreduce/{job_choice}', '-r', 'hadoop', f'{hdfs_base}/restaurants/restaurants.jsonl']
+                    cmd = ['python', f'src/mapreduce/{job_choice}', '-r', 'hadoop', '--conf-path', conf_path, f'{hdfs_base}/restaurants/restaurants.jsonl']
                     
                 result = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 st.success(f"{job_choice} completed!")
