@@ -171,3 +171,98 @@ mysql -h 127.0.0.1 -u root food_sentiment_db -e "SELECT name, district_parsed, c
 - **`init_db.py` (Hotfixes)**:
   - Đồng bộ cơ chế dự phòng mật khẩu kết nối cơ sở dữ liệu (`""` -> `"root"`) giống như `app.py`.
   - Nâng cấp regex trong hàm `_extract_district` nhằm trích xuất chính xác tên Quận ở nhiều định dạng đa dạng (tiền tố tiếng Việt, hậu tố tiếng Anh, v.v.).
+
+---
+
+## Module 5: Bin Scripts Refactor
+
+**Ngày thực hiện**: 2026-06-14
+**Mục tiêu**: Hợp lý hóa 3 scripts bin/, tách XML config ra folder riêng, thêm stop.sh, bổ sung flags cho run.sh.
+
+### Vấn đề phát hiện
+
+| Vấn đề | File bị ảnh hưởng | Mô tả |
+|--------|------------------|-------|
+| XML config inline trong .sh | install_infra.sh | Khó maintain, không tái sử dụng được |
+| setup.sh cài JDK 11 | setup.sh | Sai version, overlap với install_infra.sh |
+| run.sh luôn crawl | run.sh | Tốn 10-15 phút mỗi lần start, không có flag |
+| Refer đến setup.sh | run.sh (dòng 73) | Hướng dẫn sai khi venv không tồn tại |
+| Không có stop.sh | — | Người dùng phải kill process thủ công |
+| db_backup.sh dùng set -e | db_backup.sh | Script crash nếu MySQL hoặc Mongo down |
+
+### Các thay đổi thực hiện
+
+#### `conf/hadoop/` (files mới)
+- **Tạo** `core-site.xml` — HDFS defaultFS `hdfs://localhost:9000`
+- **Tạo** `hdfs-site.xml` — `dfs.replication=1`
+- **Tạo** `yarn-site.xml` — mapreduce_shuffle, disable vmem-check (bắt buộc cho WSL2)
+- **Tạo** `mapred-site.xml` — framework=yarn, classpath
+
+#### `conf/hive/hive-site.xml` (file mới)
+- **Tạo** `hive-site.xml` — MySQL metastore (user=hive/hive), warehouse dir, thêm `hive.stats.autogather=false` để tránh lỗi Kryo
+
+#### `bin/install_infra.sh` (refactor hoàn toàn)
+- **Thêm** version-check trước khi cài: Java 8, Hadoop 3.3.6, Hive 3.1.3, MongoDB, MySQL
+- **Thay** inline XML heredoc → `cp "${BASE_DIR}/conf/hadoop/*.xml"` và `cp "${BASE_DIR}/conf/hive/hive-site.xml"`
+- **Gộp** Python venv setup từ setup.sh: cài python3-venv, tạo venv, cài requirements.txt
+- **Thêm** `init_db.py` call ở cuối để khởi tạo schema và seed data
+- **Thêm** idempotent guards: SSH key chỉ thêm nếu chưa có, NameNode format chỉ chạy lần đầu
+- **Fix** `.bashrc` append: dùng `>>` thay vì overwrite, có guard để không duplicate
+
+#### `bin/run.sh` (refactor)
+- **Thêm** flag `--crawl`: chỉ chạy scraper + `init_db.py` + HDFS sync khi có flag này
+- **Thêm** flag `--jobs`: chỉ chạy `run_all_jobs.py` khi có flag này
+- **Thêm** flag `--help`: in hướng dẫn sử dụng
+- **Thêm** version-check Java 8 và Hadoop 3.3.6 — exit nếu sai, yêu cầu chạy install_infra.sh
+- **Fix** refer đến setup.sh → thay bằng install_infra.sh
+- **Thêm** port summary rõ ràng sau khi start services
+- **Cải thiện** service start: dùng check_port() để skip nếu đã running
+
+#### `bin/stop.sh` (tạo mới)
+- **Tạo** script dừng toàn bộ theo thứ tự: Streamlit → YARN → HDFS → MongoDB → MySQL
+- **Thêm** flag `--backup`: chạy db_backup.sh trước khi stop
+- **Thêm** flag `--cleandata`: xóa MySQL food_sentiment_db, MongoDB sentiment_db, HDFS /data/raw
+- **Không dùng** `set -e` — từng bước tự xử lý lỗi, không crash khi service đã down
+
+#### `src/backup/db_backup.sh` (fix)
+- **Xóa** `set -e`
+- **Thêm** kiểm tra return code của `mysqldump` và `mongodump` riêng biệt
+- **Thêm** biến `BACKUP_SUCCESS=true` — báo cáo partial failure thay vì crash hoàn toàn
+- **Thêm** hiển thị kích thước file backup sau khi hoàn thành
+
+---
+
+## Module 6: Docs & File Cleanup
+
+**Ngày thực hiện**: 2026-06-14
+**Mục tiêu**: Di chuyển file stray, cập nhật README, dọn dẹp cấu trúc.
+
+### Các thay đổi thực hiện
+
+#### File stray di chuyển từ root
+| File cũ | File mới | Ghi chú |
+|---------|----------|---------|
+| `rules.md` (root) | `docs/rules.md` | Quy tắc làm việc nhóm |
+| `test_hive.py` (root) | `src/mapreduce/test_hive_connection.py` | Đổi tên rõ ràng hơn, thêm docstring |
+| `test_district.py` (root) | `src/mapreduce/test_district_parsing.py` | Fix sys.path để chạy từ bất kỳ thư mục nào |
+
+#### Files cần xóa thủ công (user tự xóa)
+- `rules.md` (root)
+- `test_hive.py` (root)
+- `test_district.py` (root)
+- `refactor.md` (root)
+- `final-refactor.md` (root)
+- `bin/setup.sh`
+- `tmp-pandas/` (thư mục)
+
+#### `README.md` (rewrite hoàn toàn)
+- **Cập nhật** quick start: bỏ setup.sh, flow mới `install_infra.sh` → `run.sh [--crawl] [--jobs]` → `stop.sh [--backup] [--cleandata]`
+- **Thêm** bảng Tech Stack & Version
+- **Cập nhật** cấu trúc thư mục đúng với thực tế hiện tại (có `conf/hadoop/`, `conf/hive/`, bỏ `setup.sh`)
+- **Thêm** bảng 8 MapReduce jobs
+- **Thêm** bảng 7 Hive analytics views
+- **Ghi rõ** mối liên hệ TripAdvisor ↔ TheMealDB (qua `mr_ingredient_match.py`)
+- **Thêm** bảng Troubleshooting nhanh
+
+#### `.gitignore`
+- Đã đầy đủ (`venv/`, `tmp-pandas/`, `data/backups/`, etc.) — không cần thay đổi

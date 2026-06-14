@@ -10,143 +10,207 @@ Dự án cuối kỳ của nhóm 4 thành viên. Dự án được phát triển
 | STT | Họ và Tên | MSSV | Vai trò chính | Chi tiết công việc thực hiện | Tỉ lệ đóng góp |
 | :--- | :--- | :---: | :--- | :--- | :---: |
 | 1 | **Nguyễn Văn A** (Trưởng nhóm) | 23112233 | Data Engineer & DB | - Viết mã Python để cào dữ liệu từ TripAdvisor & Gọi API TheMealDB.<br>- Thiết lập MongoDB (Staging thô) và MySQL (CSDL quan hệ cho CRUD). | 100% |
-| 2 | **Trần Thị B** | 23112244 | Hadoop Infrastructure | - Cấu hình hạ tầng Hadoop (HDFS/YARN) và Apache Hive trên WSL2.<br>- Thiết lập Sqoop hoặc Python scripts đồng bộ MySQL/MongoDB sang HDFS. | 100% |
+| 2 | **Trần Thị B** | 23112244 | Hadoop Infrastructure | - Cấu hình hạ tầng Hadoop (HDFS/YARN) và Apache Hive trên WSL2.<br>- Viết Python scripts đồng bộ MySQL/MongoDB sang HDFS. | 100% |
 | 3 | **Phan Kim E** | 23112235 | MapReduce Developer | - Xây dựng và tối ưu 8 chương trình MapReduce bằng Python (`mrjob`).<br>- Viết kịch bản sao lưu và phục hồi dữ liệu tự động (`db_backup.sh`/`db_restore.sh`). | 100% |
 | 4 | **Bùi Quang F** | 23112236 | UI Developer & Media | - Phát triển giao diện Dashboard tương tác bằng Streamlit (CRUD trên MySQL, trực quan hóa OLAP từ Hive).<br>- Soạn Slide đề cương & biên tập video demo. | 100% |
 
 ---
 
-## 2. Kiến trúc hệ thống & Luồng dữ liệu tinh gọn
+## 2. Kiến trúc hệ thống & Luồng dữ liệu
 
-Hệ thống được thiết kế theo mô hình lai **Hybrid Database (Polyglot Persistence)** kết hợp giữa Cơ sở dữ liệu tác nghiệp (OLTP) và Kho dữ liệu phân tích lớn (OLAP) một cách logic nhất:
+Hệ thống được thiết kế theo mô hình **Hybrid Database (Polyglot Persistence)** kết hợp OLTP và OLAP:
 
 ```text
-[ TripAdvisor (Scrape) ] --+
+[ TripAdvisor (Scrapy) ] --+
                            +--> [ MongoDB (NoSQL Staging) ] --+
 [ TheMealDB (REST API) ] --+                                  |
-                                                              +--> [ HDFS (JSONL) ] --> [ MapReduce ] --> [ HDFS (Processed) ]
-                           +--> [ MySQL (Relational DB) ] ----+                                                  |
-                           |                                                                                     v
-  [ Streamlit GUI ] <------+ (CRUD & SQL Queries thời gian thực)                                          [ Apache Hive ]
-        |                                                                                                        ^
-        +--------------------------------------------------------------------------------------------------------+
-                                         (Truy vấn SQL phân tích OLAP)
+                                                              +--> [ HDFS (.jsonl) ] --> [ MapReduce x8 ] --> [ HDFS (Results) ]
+                           +--> [ MySQL (Relational OLTP) ] --+                                                       |
+                                      |                                                                                v
+                            [ Streamlit CRUD ]                                                               [ Apache Hive (OLAP) ]
+                                      |                                                                                |
+                                      +------------------------------------------------------------------------> [ Streamlit Reports ]
 ```
 
-1.  **Thu thập (Ingestion):** TripAdvisor Scraper cào dữ liệu bán cấu trúc lồng nhau (nhà hàng & reviews), TheMealDB API cung cấp danh mục nguyên liệu/món ăn.
-2.  **Lưu trữ thô & Tác nghiệp (Staging & OLTP):**
-    *   **MongoDB:** Lưu trữ dữ liệu thô bán cấu trúc từ TripAdvisor phục vụ backup hoặc trích xuất thuộc tính phức tạp.
-    *   **MySQL:** Lưu trữ dữ liệu sau khi làm sạch và chuẩn hóa (mô hình hóa quan hệ: bảng restaurants, reviews, meals). Streamlit thực hiện **truy vấn SQL và các thao tác CRUD (Thêm, Đọc, Sửa, Xóa)** trực tiếp tại đây giúp hệ thống phản hồi thời gian thực tức thì.
-3.  **Lưu trữ phân tán (OLAP Storage):** Dữ liệu được đồng bộ từ MySQL/MongoDB lên **HDFS** dưới dạng các tệp JSON Lines (`.jsonl`).
-4.  **Xử lý phân tán (Processing):** 8 chương trình **MapReduce (Python `mrjob`)** chạy trên YARN/Hadoop thực hiện gom nhóm, phân tích tần suất nguyên liệu, sentiment analysis, và lưu kết quả ngược lại HDFS.
-5.  **Kho dữ liệu & Trực quan (OLAP Data Warehouse & GUI):**
-    *   **Apache Hive:** Ánh xạ kết quả xử lý của MapReduce trên HDFS thành các bảng Hive để tối ưu hóa truy vấn SQL phân tích lớn.
-    *   **Streamlit Dashboard:** Truy cập trực tiếp MySQL để thực hiện nghiệp vụ CRUD hàng ngày, và kết nối **Apache Hive** (hoặc đọc file HDFS) để hiển thị 6 biểu đồ phân tích Big Data.
+### Kết nối TripAdvisor ↔ TheMealDB
+- **TripAdvisor**: Dữ liệu nhà hàng HCMC (restaurant info, customer reviews, ratings)
+- **TheMealDB**: Dữ liệu công thức nấu ăn quốc tế (category, area, ingredients list)
+- **Điểm kết nối** (`mr_ingredient_match.py`): Dùng danh sách `ingredients` từ TheMealDB làm từ điển để match các nguyên liệu được đề cập trong review TripAdvisor → tìm ra nguyên liệu nào phổ biến nhất trong đánh giá nhà hàng HCMC.
 
 ---
 
-## 3. Cấu trúc thư mục mã nguồn
+## 3. Tech Stack & Phiên bản
+
+| Component | Version | Vai trò |
+|---|---|---|
+| OpenJDK | **8** LTS | Runtime cho Hadoop & Hive (bắt buộc, Java 11+ gây lỗi Kryo) |
+| Apache Hadoop | **3.3.6** | HDFS phân tán + YARN task scheduler |
+| Apache Hive | **3.1.3** | Data warehouse / OLAP SQL trên HDFS |
+| MongoDB Community | **8.0** LTS | Raw data staging (semi-structured) |
+| MySQL Server | **8.0** | Relational OLTP database |
+| Python | 3.10 / 3.11 | MapReduce (mrjob), crawler, ingest scripts |
+| Streamlit | **1.35.0** | Web dashboard (port 8501) |
+| Scrapy | **2.11.0** | TripAdvisor spider |
+
+---
+
+## 4. Cấu trúc thư mục
 
 ```text
-food-sentiment-bigdata/
+final-bdes/
 │
-├── bin/                       # Tập lệnh tự động hóa Bash Shell trên WSL2
-│   ├── setup.sh               # Thiết lập môi trường ảo venv, cài thư viện Python
-│   └── run.sh                 # Thiết lập biến môi trường, khởi chạy MySQL, MongoDB, HDFS, Hive, Streamlit
+├── bin/                        # Bash scripts — entry points
+│   ├── install_infra.sh        # Chạy 1 lần: cài Java, Hadoop, Hive, MySQL, MongoDB, venv
+│   ├── run.sh                  # Chạy pipeline: start services + Streamlit
+│   └── stop.sh                 # Dừng tất cả dịch vụ
 │
-├── config/                    # Thư mục chứa tệp cấu hình mẫu
-│   ├── hadoop/                # core-site.xml, hdfs-site.xml, mapred-site.xml, yarn-site.xml
-│   ├── mysql/                 # my.cnf
-│   └── mongo/                 # mongod.conf
+├── conf/                       # Config files (tách riêng khỏi scripts)
+│   ├── hadoop/                 # core-site.xml, hdfs-site.xml, yarn-site.xml, mapred-site.xml
+│   ├── hive/                   # hive-site.xml
+│   └── mrjob.conf              # mrjob Hadoop runner config
 │
-├── src/                       # Mã nguồn phát triển
-│   ├── crawler/               # Crawler thu thập dữ liệu (TripAdvisor & TheMealDB API)
-│   │   └── seed/              # Thư mục chứa dữ liệu tĩnh phòng hờ khi mất mạng
-│   ├── ingest/                # Script đẩy dữ liệu từ MySQL/MongoDB sang HDFS (.jsonl)
-│   ├── mapreduce/             # 8 chương trình MapReduce phân tích dữ liệu bằng Python (mrjob)
-│   ├── backup/                # Script db_backup.sh và db_restore.sh
-│   └── streamlit_app/         # Giao diện trực quan hóa và thao tác dữ liệu (Streamlit)
+├── src/
+│   ├── crawler/                # Data crawling
+│   │   ├── tripadvisor_job/    # Scrapy spider
+│   │   ├── fetch_mealdb.py     # TheMealDB API client
+│   │   └── seed/               # Offline fallback data (restaurants.json, meals.json, ...)
+│   ├── ingest/                 # Data normalization & DB initialization
+│   │   ├── init_db.py          # MySQL schema init + normalize data from MongoDB
+│   │   ├── import_tripadvisor.py  # Load scraped data into MongoDB
+│   │   ├── mongo_to_hdfs.py    # Export MongoDB → HDFS (.jsonl)
+│   │   ├── mysql_to_hdfs.py    # Export MySQL → HDFS (.jsonl)
+│   │   ├── hive_schema.sql     # Hive external table definitions
+│   │   └── hive_analytics.sql  # Hive analytics views (7 views)
+│   ├── mapreduce/              # 8 MapReduce jobs (Python mrjob)
+│   │   ├── mr_rating_by_district.py
+│   │   ├── mr_cuisine_count.py
+│   │   ├── mr_rating_bucket.py
+│   │   ├── mr_sentiment_analysis.py
+│   │   ├── mr_ingredient_match.py
+│   │   ├── mr_top_reviewed.py
+│   │   ├── mr_review_distribution.py
+│   │   ├── mr_delivery_analysis.py
+│   │   ├── run_all_jobs.py         # Run all 8 jobs with summary output
+│   │   ├── test_local.py           # Local mode test (no Hadoop needed)
+│   │   ├── test_hive_connection.py # HiveServer2 smoke test
+│   │   └── test_district_parsing.py # District normalization unit test
+│   ├── streamlit_app/          # Web dashboard
+│   │   ├── app.py              # Main Streamlit app (CRUD + Reports + DevOps)
+│   │   └── hive_connector.py   # Hive query module (pyhive → CLI → offline fallback)
+│   └── backup/                 # Backup & restore scripts
+│       ├── db_backup.sh        # Backup MySQL + MongoDB
+│       └── db_restore.sh       # Restore from backup
 │
-├── data/                      # Thư mục chứa dữ liệu cục bộ (Được thêm vào .gitignore)
-│   ├── db/                    # Cơ sở dữ liệu vật lý của MongoDB
-│   └── hdfs/                  # Dữ liệu vật lý của Hadoop NameNode/DataNode
+├── data/                       # Local data (gitignored)
+│   └── backups/                # db_backup.sh output
 │
-├── docs/                      # Tài liệu báo cáo, Slides thuyết trình, Bảng tự chấm
-└── requirements.txt           # Danh sách các thư viện Python cần cài đặt
+├── docs/                       # Documentation
+│   ├── ARCHITECTURE.md
+│   ├── MASTERPLAN.md
+│   ├── REQUIREMENTS.md
+│   ├── TROUBLESHOOTING.md
+│   ├── rules.md                # Team working rules
+│   └── process/                # Execution logs & debug notes
+│
+├── requirements.txt
+├── GEMINI.md                   # AI agent rules & schema reference
+├── SETUP_GUIDE.md
+└── TEST_PLAN.md
 ```
 
 ---
 
-## 4. Yêu cầu hệ thống tối thiểu & Cài đặt dịch vụ (Máy Teammate)
+## 5. Hướng dẫn khởi chạy nhanh (Quick Start)
 
-Để khởi chạy toàn bộ pipeline mượt mà trên môi trường Ubuntu 24.04/26.04 WSL2, máy tính của thành viên cần cấu hình sẵn các dịch vụ sau trong phân phối **Ubuntu**:
+### Yêu cầu
+- Windows 10/11 với WSL2 cài **Ubuntu 24.04 LTS**
+- RAM tối thiểu 8 GB, ổ cứng còn trống 10 GB+
+- Kết nối internet (để tải Hadoop, Hive lần đầu)
 
-### 1. Phân phối hệ điều hành
-* **Windows 10/11** có cài đặt **WSL2** và chạy phân phối **Ubuntu** (Lưu ý: chuyển phân phối mặc định của WSL về Ubuntu nếu cần: `wsl -s Ubuntu`).
+### Bước 1: Clone repo & cấp quyền thực thi
 
-### 2. Cài đặt Python 3.10 hoặc 3.11 & Java 11
-Sử dụng virtual environment `venv` để tránh lỗi do thiếu `distutils` trên Python 3.12+:
 ```bash
-sudo apt update
-sudo apt install python3.10 python3.10-venv python3.10-dev openjdk-11-jdk -y
+# Trong Ubuntu WSL2 terminal
+cd /mnt/d/Project   # hoặc thư mục bạn muốn
+git clone <repo-url> final-bdes
+cd final-bdes
+chmod +x bin/*.sh src/backup/*.sh
 ```
 
-### 3. Cài đặt và cấu hình MySQL Server
+### Bước 2: Cài đặt hạ tầng (chỉ chạy 1 lần trên máy mới)
+
 ```bash
-# Cài đặt MySQL
-sudo apt install mysql-server -y
-sudo service mysql start
-
-# Cấu hình tài khoản root cho phép kết nối từ script Python (host localhost & 127.0.0.1)
-sudo mysql -u root -e "
-CREATE USER IF NOT EXISTS 'root'@'127.0.0.1' IDENTIFIED BY '';
-ALTER USER 'root'@'127.0.0.1' IDENTIFIED BY '';
-GRANT ALL PRIVILEGES ON *.* TO 'root'@'127.0.0.1' WITH GRANT OPTION;
-ALTER USER 'root'@'localhost' IDENTIFIED BY '';
-GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' WITH GRANT OPTION;
-FLUSH PRIVILEGES;"
-
-# Khởi động lại dịch vụ
-sudo service mysql restart
+./bin/install_infra.sh
 ```
 
-### 4. Cài đặt và cấu hình MongoDB Server (Community Edition)
+Script này tự động:
+- Kiểm tra và cài Java 8, Hadoop 3.3.6, Hive 3.1.3, MongoDB 8.0, MySQL 8.0
+- Copy XML config từ `conf/` vào các thư mục cài đặt
+- Tạo Python `venv` và cài dependencies từ `requirements.txt`
+- Khởi tạo MySQL schema và load dữ liệu mẫu (seed data)
+
+### Bước 3: Khởi chạy pipeline
+
 ```bash
-# Thêm MongoDB GPG key và repository
-sudo apt-get install gnupg curl -y
-curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | sudo gpg -o /usr/share/keyrings/mongodb-server-8.0.gpg --dearmor
-echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu noble/mongodb-org/8.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
-
-# Cài đặt và khởi chạy MongoDB
-sudo apt update
-sudo apt install -y mongodb-org
-sudo service mongod start
-```
-
-### 5. Cài đặt Apache Hadoop 3.3.6 LTS
-* Tải và giải nén Apache Hadoop 3.3.6 LTS vào thư mục `/usr/local/hadoop` và cấu hình Single-Node Cluster trên Linux.
-
-
----
-
-## 5. Hướng dẫn khởi chạy nhanh (Quick Start Guide)
-
-### Bước 1: Chuẩn bị môi trường (Chỉ cần chạy 1 lần duy nhất)
-Mở terminal Ubuntu 24.04 trên WSL2, di chuyển đến thư mục dự án và chạy:
-```bash
-chmod +x bin/setup.sh
-./bin/setup.sh
-```
-*Tác dụng:* Tự động khởi tạo môi trường ảo Python `venv` và cài đặt các dependencies, tạo cơ sở dữ liệu và bảng mẫu trong MySQL và MongoDB.
-
-### Bước 2: Khởi chạy dự án
-Chạy file script khởi động toàn bộ hệ thống:
-```bash
-chmod +x bin/run.sh
+# Chạy với data đã có (không cào lại):
 ./bin/run.sh
+
+# Cào dữ liệu mới → ingest → Streamlit:
+./bin/run.sh --crawl
+
+# Cào + chạy 8 MapReduce jobs + Streamlit:
+./bin/run.sh --crawl --jobs
 ```
-*Tác dụng:* 
-1. Khởi động các database daemons (`sudo service mysql start`, `sudo service mongod start`).
-2. Khởi động Hadoop HDFS (`start-dfs.sh`) và YARN (`start-yarn.sh`).
-3. Thực hiện cào dữ liệu mới và đồng bộ từ MySQL/MongoDB lên HDFS.
-4. Kích hoạt Hive Server và chạy ứng dụng Streamlit trên cổng 8501. Bạn có thể mở trình duyệt trên Windows tại địa chỉ `http://localhost:8501`.
+
+Mở trình duyệt Windows tại: **http://localhost:8501**
+
+### Bước 4: Dừng dịch vụ
+
+```bash
+./bin/stop.sh                   # Dừng tất cả
+./bin/stop.sh --backup          # Backup trước khi dừng
+./bin/stop.sh --cleandata       # Wipe data (demo reset)
+```
+
+---
+
+## 6. MapReduce Jobs (8 jobs)
+
+| Job | Input | Mô tả |
+|-----|-------|-------|
+| `mr_rating_by_district.py` | restaurants.jsonl | Rating trung bình theo quận (extract từ địa chỉ) |
+| `mr_cuisine_count.py` | meals.jsonl | Tần suất danh mục & vùng ẩm thực (TheMealDB) |
+| `mr_rating_bucket.py` | restaurants.jsonl | Phân nhóm nhà hàng theo rating (1-2 / 2-3 / 3-4 / 4-5 sao) |
+| `mr_sentiment_analysis.py` | restaurants.jsonl | Sentiment score từ review comments |
+| `mr_ingredient_match.py` | restaurants.jsonl | Nguyên liệu được đề cập trong review (kết nối TheMealDB) |
+| `mr_top_reviewed.py` | restaurants.jsonl | Top 10 nhà hàng được review nhiều nhất |
+| `mr_review_distribution.py` | restaurants.jsonl | Phân phối sao đánh giá (1→5 sao) |
+| `mr_delivery_analysis.py` | restaurants.jsonl | So sánh rating: đề cập delivery vs dine-in |
+
+---
+
+## 7. Hive Analytics Views (7 views)
+
+| View | Mô tả |
+|------|-------|
+| `view_rating_by_district` | Avg rating + số nhà hàng theo quận (dùng `district_parsed`) |
+| `view_cuisine_frequency` | Phân bố danh mục ẩm thực từ TheMealDB |
+| `view_cuisine_area` | Phân bố vùng ẩm thực từ TheMealDB |
+| `view_top_districts` | Top quận theo số lượng nhà hàng |
+| `view_rating_histogram` | Phân bố nhà hàng theo nhóm rating |
+| `view_review_distribution` | Phân phối sao trong reviews |
+| `view_delivery_sentiment` | Delivery-mentioned vs dine-in avg rating |
+
+---
+
+## 8. Troubleshooting nhanh
+
+| Lỗi | Giải pháp |
+|-----|-----------|
+| Java không phải 1.8 | `sudo update-alternatives --config java` → chọn Java 8 |
+| Hive `NoSuchFieldException: parentOffset` | Kiểm tra JAVA_HOME trỏ đúng Java 8 |
+| MySQL `Access denied` | Chạy lại `./bin/install_infra.sh` để reset password |
+| HDFS NameNode không start | `hdfs namenode -format -force` rồi start lại |
+| Streamlit import error | `source venv/bin/activate` rồi `pip install -r requirements.txt` |
+
+Xem chi tiết: [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md)
