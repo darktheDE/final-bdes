@@ -4,13 +4,9 @@
 
 - **Ubuntu 24.04 WSL2 Clean Environment**: The system is assumed to run on a clean Ubuntu 24.04 LTS installation inside WSL2. **No services are pre-installed.**
 - **Service Installation Restriction**:
-  - The setup script `bin/setup.sh` **MUST NOT** install system-wide database or big data services (MySQL, MongoDB, Hadoop, Hive, Java).
-  - The developer/user must install these services manually.
-  - `bin/setup.sh` is strictly limited to:
-    1. Verifying if basic command line utilities are present (python3, pip3, java).
-    2. Creating the Python virtual environment (`venv`).
-    3. Installing Python dependencies from `requirements.txt`.
-    4. Running database schema initialization (`src/ingest/init_db.py`) **only if** MySQL/MongoDB services are running. If they are not running, print a clear diagnostic warning and exit gracefully without crashing.
+  - The script `bin/install_infra.sh` handles ALL infrastructure installation: Java 8, Hadoop, Hive, MySQL, MongoDB, Python venv.
+  - The developer/user must run `bin/install_infra.sh` once on a clean machine, then use `bin/run.sh` for every subsequent run.
+  - `bin/run.sh` is the **sole entry point** for running the full pipeline. It accepts `--crawl` flag to fetch fresh data.
 - **Ubuntu 24.04 WSL2 Compatibility**: All generated scripts and configurations must run natively on Ubuntu 24.04 LTS inside WSL2.
   - Never write Windows Batch scripts (`.bat`) for active Linux executions. Use Linux Bash scripts (`.sh`) or Python.
   - Paths must follow POSIX standards (e.g., `/usr/local/hadoop`, `./src/crawler/seed/`). Never use backslashes (`\`) for Linux paths.
@@ -75,60 +71,101 @@ When implementing any task in this repository, the AI Agent must follow these st
 ## Project Structure & File Map
 
 Always place newly generated files or reference existing files using this exact map:
-- `bin/setup.sh`: One-click environment verification and automated library installation for Ubuntu 24.04 WSL2.
-- `bin/run.sh`: Entry point script to set session variables, launch MySQL/MongoDB/HDFS, run pipelines, and start Streamlit.
+- `bin/install_infra.sh`: **Run once** — installs Java 8, Hadoop 3.3.6, Hive 3.1.3, MySQL, MongoDB, Python venv, and all dependencies. Also copies XML config from `conf/`.
+- `bin/run.sh`: **Entry point** — starts all services, optionally fetches data (`--crawl`), runs MapReduce jobs (`--jobs`), launches Streamlit on port 8501.
+- `bin/stop.sh`: Stops all services. Accepts `--backup` (backup before stop) and `--cleandata` (wipe all data, for demo).
+- `conf/hadoop/`: Hadoop XML config files (`core-site.xml`, `hdfs-site.xml`, `yarn-site.xml`, `mapred-site.xml`).
+- `conf/hive/hive-site.xml`: Hive metastore config.
+- `conf/mrjob.conf`: mrjob Hadoop runner config.
 - `src/crawler/`: Scraping scripts (`tripadvisor_job/` Scrapy spider, `fetch_mealdb.py`).
 - `src/crawler/seed/`: Offline backup files for local development.
-- `src/ingest/`: MongoDB-to-HDFS and MySQL-to-HDFS data pipeline (`mongo_to_hdfs.py`, `mysql_to_hdfs.py`).
-- `src/mapreduce/`: Contains the 8 independent MapReduce jobs (e.g., `mr_cuisine_count.py`).
-- `src/streamlit_app/`: Frontend dashboard application (`app.py`).
+- `src/ingest/`: Data normalization + DB init (`init_db.py`), MongoDB-to-HDFS (`mongo_to_hdfs.py`), MySQL-to-HDFS (`mysql_to_hdfs.py`), Hive schema/analytics SQL.
+- `src/mapreduce/`: Contains 8 independent MapReduce jobs.
+- `src/streamlit_app/`: Frontend dashboard (`app.py`, `hive_connector.py`).
+- `src/backup/`: Backup and restore scripts (`db_backup.sh`, `db_restore.sh`).
+- `docs/process/`: Execution logs, debug notes, refactor logs.
 
 ---
 
 ## Data Schema Reference
 
-Ensure any code dealing with database interactions or MapReduce analytics maps exactly to these schemas:
+Ensure any code dealing with database interactions or MapReduce analytics maps exactly to these schemas.
 
-### MongoDB Collection: `restaurants` (TripAdvisor Raw Schema)
+> **⚠️ Source of Truth**: Schemas below reflect **actual scraped data**, not original design assumptions.
+
+### MongoDB Collection: `restaurants` (TripAdvisor — Actual Scraped Schema)
 ```json
 {
-  "_id": "restaurant_12345",
-  "name": "Pho",
-  "rating": 4.5,
-  "review_count": 128,
-  "address": "123 Nguyen Trai, District 1, HCMC",
-  "district": "District 1",
-  "city": "HCMC",
+  "_id": "https://www.tripadvisor.com/Restaurant_Review-g293925-d33215720-...",
+  "name": "Bún Chả Hà Thành by Hanoi Corner",
+  "rating": 5.0,
+  "review_count": "(112)",
+  "address": "18B/17 Đ. Nguyễn Thị Minh Khai Quận 1, Ho Chi Minh City 70000 Vietnam",
+  "district": "18B/17 Đ. Nguyễn Thị Minh Khai Quận 1",
+  "city": "Ho Chi Minh City 70000 Vietnam",
   "reviews": [
     {
-      "user": "Alice",
-      "rating": 5,
-      "comment": "Excellent Pho! The broth is very rich and authentic."
+      "user": "Chloe C",
+      "rating": "5 of 5 bubbles",
+      "comment": "Excellent food with friendly service by Ly."
     }
   ]
 }
 ```
+**Parsing rules applied by `init_db.py`:**
+- `_id` (URL) → `id` extracted as `rest_dXXXXXXXX`
+- `review_count` `"(112)"` → INT `112`
+- `district` (full address) → `district_parsed` (extracted quận name, e.g. `"Quận 1"`)
+- `city` `"Ho Chi Minh City 70000 Vietnam"` → `"Ho Chi Minh City"`
+- review `rating` `"5 of 5 bubbles"` → FLOAT `5.0`
+- **No `price_range` field exists in TripAdvisor data**
 
-### MySQL Relational Tables (Cleaned Schema)
+### MongoDB Collection: `meals` (TheMealDB — Actual Schema)
+```json
+{
+  "_id": "meal_53262",
+  "name": "Adana kebab",
+  "category": "Lamb",
+  "area": "Turkish",
+  "instructions": "step 1\r\nFinely chop the peppers...",
+  "ingredients": ["Romano Pepper", "Lamb Mince", "Red Pepper Paste"]
+}
+```
+**Relationship to TripAdvisor data**: `mr_ingredient_match.py` uses the `ingredients` list from TheMealDB as a vocabulary to find ingredient mentions in TripAdvisor review comments.
+
+### MySQL Relational Tables (Cleaned Schema — post-normalize)
 - **Table:** `restaurants`
-  - `id` (VARCHAR(50), Primary Key)
-  - `name` (VARCHAR(100))
-  - `rating` (FLOAT)
-  - `review_count` (INT)
-  - `address` (VARCHAR(255))
-  - `district` (VARCHAR(50))
-  - `city` (VARCHAR(50))
-  - `price_range` (VARCHAR(20))
+  - `id` (VARCHAR(255), Primary Key) — e.g. `rest_d33215720`
+  - `name` (VARCHAR(255))
+  - `rating` (FLOAT) — restaurant-level average rating
+  - `review_count` (INT) — parsed from `"(112)"`
+  - `address` (VARCHAR(500)) — full raw address
+  - `district` (VARCHAR(255)) — raw district string from TripAdvisor
+  - `district_parsed` (VARCHAR(100)) — extracted quận name, e.g. `"Quận 1"`
+  - `city` (VARCHAR(100)) — normalized, e.g. `"Ho Chi Minh City"`
+  - ~~`price_range`~~ — **REMOVED** (field does not exist in TripAdvisor data)
 - **Table:** `reviews`
   - `id` (INT, Auto Increment, Primary Key)
-  - `restaurant_id` (VARCHAR(50), Foreign Key pointing to `restaurants(id)`)
-  - `user` (VARCHAR(50))
-  - `rating` (FLOAT)
+  - `restaurant_id` (VARCHAR(255), Foreign Key → `restaurants(id)`)
+  - `user` (VARCHAR(255))
+  - `rating` (FLOAT) — parsed from `"5 of 5 bubbles"` → `5.0`
   - `comment` (TEXT)
 - **Table:** `meals`
-  - `id` (VARCHAR(50), Primary Key)
-  - `name` (VARCHAR(100))
-  - `category` (VARCHAR(50))
-  - `area` (VARCHAR(50))
+  - `id` (VARCHAR(255), Primary Key) — e.g. `meal_53262`
+  - `name` (VARCHAR(255))
+  - `category` (VARCHAR(100)) — e.g. `"Lamb"`, `"Seafood"`
+  - `area` (VARCHAR(100)) — e.g. `"Turkish"`, `"British"`
   - `instructions` (TEXT)
-  - `ingredients` (TEXT) -- Comma-separated list or JSON array string
+  - `ingredients` (TEXT) — comma-separated string, e.g. `"Garlic, Onion, Pepper"`
+
+### MapReduce Jobs (8 jobs)
+| Job | Input | Description |
+|-----|-------|-------------|
+| `mr_rating_by_district.py` | restaurants.jsonl | Avg rating per parsed district |
+| `mr_cuisine_count.py` | meals.jsonl | Frequency of meal categories & areas |
+| `mr_rating_bucket.py` | restaurants.jsonl | Count restaurants per rating group (replaces price_segment) |
+| `mr_sentiment_analysis.py` | restaurants.jsonl | Sentiment score per restaurant from review comments |
+| `mr_ingredient_match.py` | restaurants.jsonl | Ingredient mentions in reviews (linked to TheMealDB) |
+| `mr_top_reviewed.py` | restaurants.jsonl | Top 10 most-reviewed restaurants |
+| `mr_review_distribution.py` | restaurants.jsonl | Distribution of star ratings in reviews |
+| `mr_delivery_analysis.py` | restaurants.jsonl | Avg rating: delivery-mentioned vs dine-in reviews |

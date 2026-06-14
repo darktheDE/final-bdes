@@ -8,7 +8,7 @@ from decimal import Decimal
 # MySQL Configuration
 MYSQL_CONFIG = {
     'user': 'root',
-    'password': 'root',
+    'password': '',
     'host': '127.0.0.1',
     'port': 3306,
     'database': 'food_sentiment_db',
