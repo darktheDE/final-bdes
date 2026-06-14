@@ -16,7 +16,12 @@ class MRReviewDistribution(MRJob):
                         match = re.search(r'(\d+(\.\d+)?)', rating)
                         rating = float(match.group(1)) if match else None
                     if rating is not None:
-                        yield float(rating), 1
+                        # Bucket the rating to an integer value and format as string
+                        rounded_rating = int(round(float(rating)))
+                        # Ensure it's between 1 and 5
+                        rounded_rating = max(1, min(5, rounded_rating))
+                        bucket = f"{rounded_rating} Star" + ("s" if rounded_rating > 1 else "")
+                        yield bucket, 1
         except Exception:
             pass
 

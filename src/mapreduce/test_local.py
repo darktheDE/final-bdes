@@ -74,8 +74,8 @@ def main():
             "args": []
         },
         {
-            "name": "mr_price_segment.py",
-            "script": "src/mapreduce/mr_price_segment.py",
+            "name": "mr_rating_bucket.py",
+            "script": "src/mapreduce/mr_rating_bucket.py",
             "input": TEMP_REST_JSONL,
             "args": []
         },

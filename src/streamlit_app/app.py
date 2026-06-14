@@ -399,7 +399,12 @@ def render_devops_page():
     job_choice = st.selectbox("Select Job to Run", [
         "mr_rating_by_district.py",
         "mr_cuisine_count.py",
-        "mr_price_segment.py"
+        "mr_price_segment.py",
+        "mr_sentiment_analysis.py",
+        "mr_ingredient_match.py",
+        "mr_top_reviewed.py",
+        "mr_review_distribution.py",
+        "mr_delivery_analysis.py"
     ])
     
     if st.button("Execute Job"):
@@ -410,6 +415,8 @@ def render_devops_page():
                 conf_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../mrjob.conf'))
                 if job_choice == 'mr_cuisine_count.py':
                     cmd = ['python', f'src/mapreduce/{job_choice}', '-r', 'hadoop', '--conf-path', conf_path, f'{hdfs_base}/meals/meals.jsonl']
+                elif job_choice == 'mr_ingredient_match.py':
+                    cmd = ['python', f'src/mapreduce/{job_choice}', '-r', 'hadoop', '--conf-path', conf_path, '--file', 'src/crawler/seed/ingredients.json', f'{hdfs_base}/restaurants/restaurants.jsonl']
                 else:
                     cmd = ['python', f'src/mapreduce/{job_choice}', '-r', 'hadoop', '--conf-path', conf_path, f'{hdfs_base}/restaurants/restaurants.jsonl']
                     

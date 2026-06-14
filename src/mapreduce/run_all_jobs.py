@@ -24,10 +24,10 @@ JOBS = [
         "extra_args": []
     },
     {
-        "name": "Price Segment",
-        "script": "src/mapreduce/mr_price_segment.py",
+        "name": "Rating Bucket",
+        "script": "src/mapreduce/mr_rating_bucket.py",
         "input": HDFS_RAW_RESTAURANTS,
-        "output": f"{HDFS_OUTPUT_DIR}/mr_price_segment",
+        "output": f"{HDFS_OUTPUT_DIR}/mr_rating_bucket",
         "extra_args": []
     },
     {
@@ -76,6 +76,39 @@ def run_cmd(args):
         return False
     return True
 
+def print_summary(job_name, output_dir):
+    print(f"\n--- Summary for {job_name} ---")
+    cat_cmd = ["hdfs", "dfs", "-cat", f"{output_dir}/part-*"]
+    res = subprocess.run(cat_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if res.returncode != 0:
+        print("  [!] Could not read output from HDFS.")
+        return
+    
+    lines = res.stdout.strip().split('\n')
+    if not lines or lines == ['']:
+        print("  No output records found.")
+        return
+        
+    print(f"  Total Output Records: {len(lines)}")
+    
+    # Parse json/tsv lines
+    parsed_records = []
+    for line in lines:
+        parts = line.split('\t', 1)
+        if len(parts) == 2:
+            try:
+                import json
+                key = json.loads(parts[0])
+                val = json.loads(parts[1])
+                parsed_records.append((key, val))
+            except:
+                parsed_records.append((parts[0], parts[1]))
+                
+    print("  Sample Results (up to 10):")
+    for i, (k, v) in enumerate(parsed_records[:10]):
+        print(f"    {i+1}. {k}: {v}")
+    print("-" * 40 + "\n")
+
 def main():
     print("=== Triggering all 8 MapReduce jobs on Hadoop ===")
     
@@ -91,6 +124,7 @@ def main():
         cmd = [
             PYTHON_BIN, job['script'],
             "-r", "hadoop",
+            "-c", "conf/mrjob.conf",
             "--python-bin", PYTHON_BIN,
             job['input'],
             "--output-dir", job['output']
@@ -100,6 +134,9 @@ def main():
         if not success:
             print(f"[!] MapReduce Job '{job['name']}' failed. Exiting.")
             sys.exit(1)
+            
+        # 3. Print summary
+        print_summary(job['name'], job['output'])
             
     print("\n[+] All 8 MapReduce jobs completed successfully on Hadoop!")
 
