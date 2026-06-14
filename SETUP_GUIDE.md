@@ -19,57 +19,78 @@ Sau khi pull repository này về máy, hãy mở terminal WSL2 Ubuntu và thự
 ### Bước 2.1: Phân quyền thực thi cho các script shell
 Chạy lệnh sau tại thư mục gốc của dự án:
 ```bash
-chmod +x bin/*.sh
+chmod +x bin/*.sh src/backup/*.sh
 ```
 
-### Bước 2.2: Cài đặt và cấu hình Hạ tầng Dữ liệu lớn (Cycle 0)
-Chạy script cài đặt hạ tầng:
+### Bước 2.2: Cài đặt và cấu hình Hạ tầng Dữ liệu lớn
+Chạy script cài đặt toàn bộ hạ tầng (chỉ chạy 1 lần duy nhất trên máy mới):
 ```bash
 ./bin/install_infra.sh
 ```
 **Script này sẽ tự động thực hiện:**
 1. Cấu hình SSH Server và SSH passwordless localhost access (cần thiết cho Hadoop).
-2. Cài đặt OpenJDK 11 (cho Hadoop) và OpenJDK 8 (cho Hive).
+2. Cài đặt **OpenJDK 8 LTS** (bắt buộc cho Hadoop và Apache Hive 3.x).
 3. Thêm các biến môi trường cần thiết (`JAVA_HOME`, `HADOOP_HOME`, `HIVE_HOME`, `PATH`) vào phần đầu của file `~/.bashrc`.
-4. Cài đặt và cấu hình MySQL Server, tạo CSDL `food_sentiment_db` và `hive_metastore` kèm theo phân quyền cho root/hive.
+4. Cài đặt và cấu hình MySQL Server 8.0, tạo CSDL `food_sentiment_db` và `hive_metastore` kèm theo phân quyền.
 5. Cài đặt MongoDB Community Server 8.0.
-6. Tải và giải nén Apache Hadoop 3.3.6, cấu hình các file XML (`core-site`, `hdfs-site`, `yarn-site`, `mapred-site`), định dạng NameNode và khởi động các service Hadoop.
-7. Tải và cấu hình Apache Hive 3.1.3, tải MySQL JDBC Connector, sửa lỗi xung đột thư viện Guava và khởi tạo Hive Metastore Schema.
+6. Cài đặt Python 3.10/3.11, tạo môi trường ảo `venv` và cài đặt các package trong `requirements.txt`.
+7. Tải và giải nén Apache Hadoop 3.3.6, copy cấu hình từ `conf/hadoop/*.xml`, định dạng NameNode.
+8. Tải và cấu hình Apache Hive 3.1.3, tải MySQL JDBC Connector, khắc phục lỗi thư viện Guava.
+9. Khởi tạo Database cho Hive Metastore Schema và chạy `src/ingest/init_db.py` để nạp dữ liệu mẫu ban đầu từ thư mục `src/crawler/seed/`.
 
 ### Bước 2.3: Reload biến môi trường
-Sau khi `install_infra.sh` hoàn thành, bạn **cần nạp lại (reload) biến môi trường** của terminal hiện tại để áp dụng các thay đổi trong `~/.bashrc`:
+Sau khi `install_infra.sh` hoàn thành, bạn **cần nạp lại (reload) biến môi trường** của terminal hiện tại để áp dụng các thay đổi:
 ```bash
 source ~/.bashrc
 ```
-
-### Bước 2.4: Thiết lập môi trường ảo Python và khởi tạo database
-Chạy kịch bản setup môi trường Python:
-```bash
-./bin/setup.sh
-```
-**Script này sẽ tự động thực hiện:**
-1. Kiểm tra và cài đặt các gói hệ thống cơ bản (`python3`, `python3-venv`, `python3-pip`).
-2. Khởi tạo môi trường ảo Python `venv` trong thư mục gốc dự án.
-3. Cài đặt tất cả các thư viện Python cần thiết từ `requirements.txt`.
-4. Chạy script `src/ingest/init_db.py` để di trú dữ liệu thô sang các bảng MySQL (`restaurants`, `reviews`, `meals`).
 
 ---
 
 ## 3. Khởi Chạy Toàn Bộ Hệ Thống (Run Pipeline)
 
-Khi hạ tầng và môi trường ảo đã được chuẩn bị xong, bạn chạy lệnh sau để kích hoạt toàn bộ hệ thống pipeline và giao diện dashboard:
+Hệ thống đã được thiết kế tự động hóa hoàn toàn thông qua script `bin/run.sh`. Tùy thuộc vào nhu cầu, bạn có thể chạy với các tùy chọn (flags) sau:
 
+### Lựa chọn 1: Chạy hệ thống với dữ liệu đã có sẵn (Nhanh nhất)
 ```bash
 ./bin/run.sh
 ```
+Lệnh này sẽ khởi động các dịch vụ nền (Hadoop, MySQL, MongoDB) và mở Dashboard Streamlit.
 
-**Script này sẽ tự động:**
-1. Khởi động các dịch vụ nền (MySQL, MongoDB, Hadoop NameNode/DataNode, YARN ResourceManager/NodeManager).
-2. Kiểm tra trạng thái cổng kết nối để đảm bảo các dịch vụ hoạt động bình thường.
-3. Kích hoạt môi trường ảo Python `venv`.
-4. Chạy crawler lấy dữ liệu công thức món ăn từ API TheMealDB và TripAdvisor.
-5. Chạy các pipeline đồng bộ dữ liệu thô từ MongoDB và MySQL lên HDFS (`/data/raw/`).
-6. Khởi chạy Dashboard Streamlit trên cổng `8501`.
+### Lựa chọn 2: Thu thập dữ liệu mới & Đồng bộ HDFS
+```bash
+./bin/run.sh --crawl
+```
+Bổ sung thêm quá trình crawl dữ liệu từ API TheMealDB & TripAdvisor, sau đó chuẩn hóa vào MySQL/MongoDB, và đồng bộ `.jsonl` lên HDFS.
 
-Khi Streamlit khởi chạy thành công, bạn có thể mở trình duyệt trên Windows và truy cập địa chỉ:
+### Lựa chọn 3: Chạy toàn bộ luồng Pipeline & MapReduce Jobs
+```bash
+./bin/run.sh --crawl --jobs
+```
+Sẽ chạy đầy đủ quy trình: Khởi động dịch vụ -> Crawl dữ liệu mới -> Đồng bộ HDFS -> Thực thi toàn bộ **8 MapReduce Jobs** trên YARN -> Cập nhật Hive Views -> Mở Streamlit.
+
+---
+
+## 4. Giao diện Web Application (Streamlit)
+
+Khi quá trình khởi chạy (run.sh) hoàn tất thành công, hệ thống sẽ in ra URL. Mở trình duyệt trên Windows host và truy cập:
 👉 **[http://localhost:8501](http://localhost:8501)**
+
+---
+
+## 5. Dừng Hệ Thống (Stop/Cleanup)
+
+Để dừng an toàn các tiến trình Hadoop, YARN và các database daemon nhằm tiết kiệm RAM của máy chủ, sử dụng kịch bản sau:
+
+```bash
+./bin/stop.sh
+```
+
+**Các tuỳ chọn nâng cao:**
+* Dừng hệ thống và tạo tệp tin **Backup** dữ liệu MySQL/MongoDB:
+  ```bash
+  ./bin/stop.sh --backup
+  ```
+* **Xóa hoàn toàn dữ liệu** (Wipe All Data) để reset hệ thống cho lần demo kế tiếp:
+  ```bash
+  ./bin/stop.sh --cleandata
+  ```

@@ -24,7 +24,7 @@ Tài liệu này tổng hợp toàn bộ các yêu cầu bắt buộc và tiêu 
 - **Hệ điều hành**: **Ubuntu 24.04 LTS chạy trên WSL2** là môi trường đích chính thức. Việc chạy trên Linux/WSL2 giúp hệ thống tối ưu hóa hiệu năng I/O cho NameNode/DataNode và loại bỏ các lỗi phân quyền file trên Windows.
 - **Tech Stack Phiên Bản LTS Khuyến Nghị**:
   - **Hadoop**: Apache Hadoop 3.3.6 LTS.
-  - **Java**: OpenJDK 11 LTS (để Hadoop runtime tương thích tốt nhất).
+  - **Java**: OpenJDK 8 LTS (Bắt buộc dùng Java 8 vì Hive 3.1.3 không tương thích Java 11+ do lỗi Kryo serialization).
   - **MongoDB**: MongoDB Community Server 8.0 LTS (đáp ứng gói phân phối chính thức cho Ubuntu 24.04 LTS).
   - **MySQL**: MySQL Server 8.0 (CSDL quan hệ phục vụ SQL & CRUD).
   - **Python**: Python 3.10 / 3.11 (được cài đặt trong môi trường ảo `venv` để tránh xung đột loại bỏ `distutils` của Python 3.12 mặc định trên Ubuntu 24.04).
@@ -46,24 +46,24 @@ Tài liệu này tổng hợp toàn bộ các yêu cầu bắt buộc và tiêu 
 - [x] **Làm sạch dữ liệu**: Tiến hành sửa chữa, loại bỏ dữ liệu không chính xác, định dạng sai, xử lý dữ liệu trùng lặp (duplicates), hoặc gán nhãn sai bằng Pandas.
 - [x] **Staging DBMS**: Lưu trữ dữ liệu thu thập được vào MongoDB (`sentiment_db` NoSQL) và MySQL (`food_sentiment_db` Relational).
 - [x] **Cấu trúc dữ liệu**: Tổ chức dữ liệu theo mô hình quan hệ (MySQL) và phi cấu trúc (MongoDB) song hành.
-- [ ] **Hadoop Integration**: Dữ liệu từ MySQL và MongoDB phải được đồng bộ trực tiếp lên hệ thống tệp phân tán Hadoop (HDFS) dưới dạng tệp JSON Lines (`.jsonl`).
+- [x] **Hadoop Integration**: Dữ liệu từ MySQL và MongoDB phải được đồng bộ trực tiếp lên hệ thống tệp phân tán Hadoop (HDFS) dưới dạng tệp JSON Lines (`.jsonl`).
 
 ### 3.2. Chức năng hệ thống (Max 4.00đ)
-- [ ] **Thao tác dữ liệu (CRUD)**: Hỗ trợ giao diện thực thi truy vấn (Query), thao tác dữ liệu cơ bản (Thêm, Đọc, Sửa, Xóa) trên giao diện tương tác trực tiếp với **MySQL** bằng SQL.
-- [ ] **Sao lưu & Phục hồi**: Triển khai tính năng sao lưu (Backup) và phục hồi (Restore) dữ liệu bằng script `db_backup.sh` / `db_restore.sh` cho cả MongoDB và MySQL.
-- [ ] **Trực quan hóa**: Vẽ biểu đồ hiển thị thông tin dữ liệu thu thập được (Yêu cầu: **Tối thiểu 5 biểu đồ** thuộc **ít nhất 3 loại biểu đồ khác nhau**).
-- [ ] **Công cụ Hadoop Ecosystem (Trong chương trình - Max 1.00đ)**: Cài đặt và sử dụng các công cụ thuộc hệ sinh thái Hadoop trong chương trình học (chọn tối đa 4 công cụ, 0.25đ/công cụ):
+- [x] **Thao tác dữ liệu (CRUD)**: Hỗ trợ giao diện thực thi truy vấn (Query), thao tác dữ liệu cơ bản (Thêm, Đọc, Sửa, Xóa) trên giao diện tương tác trực tiếp với **MySQL** bằng SQL.
+- [x] **Sao lưu & Phục hồi**: Triển khai tính năng sao lưu (Backup) và phục hồi (Restore) dữ liệu bằng script `db_backup.sh` / `db_restore.sh` cho cả MongoDB và MySQL.
+- [x] **Trực quan hóa**: Vẽ biểu đồ hiển thị thông tin dữ liệu thu thập được (Yêu cầu: **Tối thiểu 5 biểu đồ** thuộc **ít nhất 3 loại biểu đồ khác nhau**).
+- [x] **Công cụ Hadoop Ecosystem (Trong chương trình - Max 1.00đ)**: Cài đặt và sử dụng các công cụ thuộc hệ sinh thái Hadoop trong chương trình học (chọn tối đa 4 công cụ, 0.25đ/công cụ):
   1. **Apache HDFS** (Hệ thống file phân tán - 0.25đ)
   2. **Apache YARN** (Bộ quản lý tài nguyên - 0.25đ)
   3. **Apache MapReduce** (Bộ máy tính toán song song - 0.25đ)
   4. **Apache Hive** (Kho dữ liệu SQL phân tán - 0.25đ)
   5. **Apache Sqoop** (Đồng bộ dữ liệu RDBMS - HDFS - 0.25đ)
-- [ ] **Công cụ Hadoop Ecosystem / Apache (Ngoài chương trình - Max 1.00đ)**:
+- [x] **Công cụ Hadoop Ecosystem / Apache (Ngoài chương trình - Max 1.00đ)**:
   * Không triển khai để đảm bảo pipeline tinh gọn, tránh dư thừa và phục vụ trực tiếp cho logic đồ án (0.00đ).
-- [ ] **Chương trình MapReduce (Max 2.00đ)**: Xây dựng và thực thi thành công **tối thiểu 8 chương trình MapReduce** trên Hadoop để phân tích dữ liệu (Tính điểm: 0.25đ / 1 chương trình MapReduce).
+- [x] **Chương trình MapReduce (Max 2.00đ)**: Xây dựng và thực thi thành công **tối thiểu 8 chương trình MapReduce** trên Hadoop để phân tích dữ liệu (Tính điểm: 0.25đ / 1 chương trình MapReduce).
 
 ### 3.3. Giao diện người dùng (Max 1.00đ)
-- [ ] **Giao diện tương tác (GUI)**: Giao diện Web App Streamlit kết nối MySQL làm nghiệp vụ tác nghiệp (CRUD/SQL) và kết nối Hive/HDFS làm trực quan hóa báo cáo.
+- [x] **Giao diện tương tác (GUI)**: Giao diện Web App Streamlit kết nối MySQL làm nghiệp vụ tác nghiệp (CRUD/SQL) và kết nối Hive/HDFS làm trực quan hóa báo cáo.
 
 ---
 
