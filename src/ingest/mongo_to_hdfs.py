@@ -34,11 +34,22 @@ def export_collection_to_jsonl(db, collection_name, local_filepath):
             # Convert _id to id for Hive compatibility
             if '_id' in doc:
                 doc['id'] = str(doc.pop('_id'))
+            
+            # Additional format verification and logging for the first document
+            if count == 0:
+                print(f"  -> Sample document structure being exported:")
+                print(f"     Keys present: {list(doc.keys())}")
+                if collection_name == 'restaurants':
+                    if 'district_parsed' in doc:
+                        print(f"     [+] 'district_parsed' field found in data")
+                    if 'price_range' not in doc:
+                        print(f"     [+] 'price_range' correctly omitted")
+            
             json_line = json.dumps(doc, cls=MongoJSONEncoder, ensure_ascii=False)
             f.write(json_line + '\n')
             count += 1
             
-    print(f"  -> Exported {count} records to {local_filepath}")
+    print(f"  -> Successfully exported {count} records to {local_filepath}")
     return count
 
 def upload_to_hdfs(local_filepath, hdfs_subdir, hdfs_filename):

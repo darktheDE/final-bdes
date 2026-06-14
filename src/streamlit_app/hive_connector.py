@@ -155,10 +155,10 @@ BATCH_QUERIES: list[tuple[str, str]] = [
      "SELECT district, avg_rating, total_count FROM view_rating_by_district LIMIT 20"),
     ("view_cuisine_frequency",
      "SELECT category, cnt FROM view_cuisine_frequency LIMIT 15"),
-    ("view_price_segment",
-     "SELECT price_range, cnt FROM view_price_segment"),
-    ("view_sentiment_by_price",
-     "SELECT price_range, avg_sentiment, review_count FROM view_sentiment_by_price"),
+    ("view_top_districts",
+     "SELECT district, restaurant_count, avg_rating FROM view_top_districts LIMIT 20"),
+    ("view_rating_histogram",
+     "SELECT rating_group, restaurant_count FROM view_rating_histogram"),
     ("view_review_distribution",
      "SELECT stars, cnt FROM view_review_distribution"),
     ("view_delivery_sentiment",
@@ -177,7 +177,7 @@ def batch_query_all_views() -> dict[str, pd.DataFrame]:
     mode = get_hive_status()
 
     if mode == "offline":
-        return {key: _MOCK_DATA[key].copy() for key, _ in BATCH_QUERIES}
+        return {}
 
     if mode == "live":
         # pyhive: still run individually (connection reuse is handled by the driver)
@@ -185,10 +185,10 @@ def batch_query_all_views() -> dict[str, pd.DataFrame]:
         for key, sql in BATCH_QUERIES:
             try:
                 df = _query_via_pyhive(sql, "food_sentiment_db")
-                results[key] = df if not df.empty else _MOCK_DATA[key].copy()
+                results[key] = df if not df.empty else pd.DataFrame()
             except Exception as exc:
                 logger.warning("pyhive batch query failed for %s: %s", key, exc)
-                results[key] = _MOCK_DATA[key].copy()
+                results[key] = pd.DataFrame()
         return results
 
     # subprocess mode: build one big script with SELECT statements separated
@@ -211,11 +211,11 @@ def batch_query_all_views() -> dict[str, pd.DataFrame]:
         )
         raw = proc.stdout + proc.stderr
     except subprocess.TimeoutExpired:
-        logger.warning("Batch Hive query timed out after %ds, using mock data", HIVE_QUERY_TIMEOUT)
-        return {key: _MOCK_DATA[key].copy() for key, _ in BATCH_QUERIES}
+        logger.warning("Batch Hive query timed out after %ds, using empty data", HIVE_QUERY_TIMEOUT)
+        return {key: pd.DataFrame() for key, _ in BATCH_QUERIES}
     except Exception as exc:
-        logger.warning("Batch Hive query failed: %s, using mock data", exc)
-        return {key: _MOCK_DATA[key].copy() for key, _ in BATCH_QUERIES}
+        logger.warning("Batch Hive query failed: %s, using empty data", exc)
+        return {key: pd.DataFrame() for key, _ in BATCH_QUERIES}
 
     # Split output on sentinel
     blocks = raw.split(_BATCH_SEP)
@@ -241,59 +241,17 @@ def batch_query_all_views() -> dict[str, pd.DataFrame]:
             if clean_block.strip():
                 df = pd.read_csv(StringIO(clean_block), sep="\t")
                 df.columns = [c.split(".")[-1] for c in df.columns]
-                results[key] = df if not df.empty else _MOCK_DATA[key].copy()
+                results[key] = df if not df.empty else pd.DataFrame()
             else:
-                results[key] = _MOCK_DATA[key].copy()
+                results[key] = pd.DataFrame()
         except Exception as exc:
             logger.warning("Failed to parse block for %s: %s", key, exc)
-            results[key] = _MOCK_DATA[key].copy()
+            results[key] = pd.DataFrame()
 
     return results
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Offline mock DataFrames — one per view, mirrors expected Hive output schema
-# ──────────────────────────────────────────────────────────────────────────────
 
-_MOCK_DATA: dict[str, pd.DataFrame] = {
-    "view_rating_by_district": pd.DataFrame({
-        "district": ["Quận 1", "Quận 3", "Quận 5", "Bình Thạnh", "Quận 7",
-                     "Tân Bình", "Quận 10", "Phú Nhuận"],
-        "avg_rating": [4.35, 4.28, 4.10, 4.20, 4.45, 4.15, 4.05, 4.30],
-        "total_count": [312, 198, 87, 145, 203, 134, 76, 110],
-    }),
-    "view_cuisine_frequency": pd.DataFrame({
-        "category": ["Seafood", "Chicken", "Beef", "Vegetarian", "Pork",
-                     "Pasta", "Dessert", "Miscellaneous", "Lamb", "Side"],
-        "cnt": [85, 78, 65, 52, 47, 43, 38, 35, 24, 18],
-    }),
-    "view_price_segment": pd.DataFrame({
-        "price_range": ["Budget", "Moderate", "Luxury", "Unknown"],
-        "cnt": [487, 612, 158, 77],
-    }),
-    "view_sentiment_by_price": pd.DataFrame({
-        "price_range": ["Luxury", "Moderate", "Budget", "Unknown"],
-        "avg_sentiment": [4.52, 4.21, 3.95, 3.80],
-        "review_count": [8423, 24156, 18934, 3201],
-    }),
-    "view_review_distribution": pd.DataFrame({
-        "stars": [1, 2, 3, 4, 5],
-        "cnt": [612, 1478, 5834, 18920, 22450],
-    }),
-    "view_delivery_sentiment": pd.DataFrame({
-        "service_type": ["Dine-in", "Delivery"],
-        "avg_rating": [4.22, 3.98],
-        "review_count": [41830, 7464],
-    }),
-}
-
-
-def _get_mock(view_name: str) -> pd.DataFrame:
-    """Return pre-computed mock DataFrame for the given view name."""
-    for key, df in _MOCK_DATA.items():
-        if key in view_name.lower():
-            return df.copy()
-    return pd.DataFrame()
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -338,7 +296,7 @@ def query_hive(sql: str, database: str = "food_sentiment_db") -> pd.DataFrame:
             mode = "offline"
 
     # mode == "offline"
-    return _get_mock(sql)
+    return pd.DataFrame()
 
 
 def reset_connection_cache() -> None:

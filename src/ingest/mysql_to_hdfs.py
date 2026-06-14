@@ -34,7 +34,12 @@ def export_table_to_jsonl(conn, table_name, local_filepath):
     print(f"[*] Exporting table '{table_name}' from MySQL...")
     cursor = conn.cursor(dictionary=True)
     
-    query = f"SELECT * FROM `{table_name}`"
+    if table_name == 'restaurants':
+        # Explicitly select columns to ignore 'price_range'
+        query = "SELECT id, name, rating, review_count, address, district, district_parsed, city FROM `restaurants`"
+    else:
+        query = f"SELECT * FROM `{table_name}`"
+        
     cursor.execute(query)
     
     count = 0

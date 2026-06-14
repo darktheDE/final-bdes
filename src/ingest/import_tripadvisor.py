@@ -2,6 +2,7 @@ import json
 import os
 import re
 import pymongo
+from init_db import _parse_review_count, _extract_district, _normalize_city, _parse_review_rating, _make_short_id
 
 MONGO_URI = "mongodb://localhost:27017/"
 DB_NAME = "sentiment_db"
@@ -19,28 +20,22 @@ def extract_float(value):
         return float(match.group(1))
     return None
 
-def extract_int(value):
-    if value is None:
-        return 0
-    if isinstance(value, int):
-        return value
-    digits = re.sub(r'\D', '', str(value))
-    if digits:
-        return int(digits)
-    return 0
-
 def clean_restaurant(rest):
+    raw_id = rest.get('_id', rest.get('url', ''))
+    rest['_id'] = _make_short_id(str(raw_id)) if raw_id else ''
+
     rest['rating'] = extract_float(rest.get('rating'))
-    rest['review_count'] = extract_int(rest.get('review_count'))
+    rest['review_count'] = _parse_review_count(rest.get('review_count'))
     
-    if not rest.get('district'):
-        rest['district'] = "Unknown"
-    if not rest.get('city'):
-        rest['city'] = "Unknown"
+    district_raw = rest.get('district', '') or ''
+    rest['district_parsed'] = _extract_district(district_raw)
+    
+    city_raw = rest.get('city', '') or ''
+    rest['city'] = _normalize_city(city_raw)
         
     cleaned_reviews = []
     for r in rest.get('reviews', []):
-        r_rating = extract_float(r.get('rating'))
+        r_rating = _parse_review_rating(r.get('rating'))
         r_comment = str(r.get('comment', '')).strip()
         r_user = str(r.get('user', '')).strip()
         
@@ -74,6 +69,9 @@ def main():
     upsert_count = 0
     for r in data:
         cleaned = clean_restaurant(r)
+        if not cleaned['_id']:
+            continue
+            
         coll.update_one(
             {'_id': cleaned['_id']},
             {'$set': cleaned},
