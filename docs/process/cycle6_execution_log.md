@@ -311,6 +311,79 @@ hive -f src/ingest/hive_schema.sql  # Tạo DB + external tables trước
 hive -f src/ingest/hive_analytics.sql  # Sau đó tạo 6 views
 ```
 
+#### Sự cố 6.8: MapReduce Job Thất Bại (PipeMapRed.waitOutputThreads() code 1) khi Chạy Từ Streamlit
+
+**Triệu chứng:**
+Khi chạy MapReduce jobs (ví dụ `mr_rating_by_district.py`) từ Streamlit UI (DevOps tab), job thất bại ngay lập tức với lỗi trong Hadoop YARN:
+```
+Error: java.lang.RuntimeException: PipeMapRed.waitOutputThreads(): subprocess failed with code 1
+```
+
+**Nguyên nhân gốc (Root Cause):**
+Khi Streamlit khởi chạy MapReduce qua subprocess (`subprocess.check_output(['python', ...])`), `mrjob` được kích hoạt nhưng không nhận diện được file cấu hình `mrjob.conf`. Do đó, nó "falling back on auto-configuration" và tự động sử dụng `python3` mặc định của hệ thống (`/usr/bin/python3`) trên các worker node thay vì python trong virtual environment (`venv/bin/python3`). Vì thư viện `mrjob` chỉ được cài đặt trong `venv`, mapper Python script ném ra ngoại lệ khi cố gắng import `mrjob` ngay khi khởi chạy, làm subprocess trả về exit code 1.
+
+**Giải pháp:**
+Cập nhật mã nguồn `src/streamlit_app/app.py` để truyền rành mạch tham số `--conf-path` trỏ đến file `mrjob.conf` gốc của dự án, đảm bảo MapReduce runner luôn đọc đúng cấu hình môi trường:
+```python
+conf_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../mrjob.conf'))
+if job_choice == 'mr_cuisine_count.py':
+    cmd = ['python', f'src/mapreduce/{job_choice}', '-r', 'hadoop', '--conf-path', conf_path, f'{hdfs_base}/meals/meals.jsonl']
+else:
+    cmd = ['python', f'src/mapreduce/{job_choice}', '-r', 'hadoop', '--conf-path', conf_path, f'{hdfs_base}/restaurants/restaurants.jsonl']
+```
+Sau bản vá, MapReduce đọc đúng thiết lập `python_bin` trong `mrjob.conf` và thực thi thành công từ giao diện Streamlit.
+
+#### Sự cố 6.9: Chuyển Đổi Hoàn Toàn Sang Java 8 Để Tránh `NoSuchFieldException`
+
+**Triệu chứng:**
+Khi Streamlit gửi query qua `pyhive` để kích hoạt MapReduce trong Hive, Hive JVM bị sập với lỗi `java.lang.RuntimeException: java.lang.NoSuchFieldException: parentOffset`. Lỗi này liên quan đến Kryo serialization trong Hive 3.x khi chạy trên Java 11.
+
+**Giải pháp:**
+Thay vì chỉ đổi `JAVA_HOME` cục bộ trong file `hive-env.sh`, chúng tôi đã ép toàn bộ hệ sinh thái (Hadoop + Hive) sang Java 8 (`/usr/lib/jvm/java-8-openjdk-amd64`) một cách nhất quán:
+1. Đặt `JAVA_HOME` vào `~/.bashrc`.
+2. Hardcode `JAVA_HOME` trong `/usr/local/hadoop/etc/hadoop/hadoop-env.sh`.
+3. Khởi động lại toàn bộ stack (HDFS, YARN, HiveServer2). Nhờ đó, MapReduce từ Hive tương thích hoàn toàn.
+
+#### Sự cố 6.10: MapRedTask Trả Về Return Code 2 Do OutOfMemoryError (Local Mode)
+
+**Triệu chứng:**
+Mặc dù đã dùng Java 8, các query từ Streamlit (`view_cuisine_frequency`, `view_rating_by_district`) vẫn bị lỗi:
+```
+FAILED: Execution Error, return code 2 from org.apache.hadoop.hive.ql.exec.mr.MapRedTask
+```
+Kiểm tra sâu vào `syslog` của YARN không thấy lỗi Exception, nhưng xem trong log của HiveServer2 (`/tmp/kien_hung/hive.log`), phát hiện ra:
+```
+java.lang.Exception: java.lang.OutOfMemoryError: Java heap space
+  at org.apache.hadoop.mapred.LocalJobRunner$Job.runTasks
+```
+
+**Nguyên nhân:**
+Vì chúng ta đã bật chế độ `set hive.exec.mode.local.auto=true` siêu tốc cục bộ, MapReduce không đẩy qua YARN mà chạy trực tiếp trong JVM của HiveServer2. Tuy nhiên, JVM mặc định của HiveServer2 chỉ có 256MB RAM (`-Xmx256m`), khiến tiến trình JSON deserialize cạn kiệt bộ nhớ ngay lập tức.
+
+**Giải pháp:**
+Mở rộng không gian cấp phát heap cho máy khách Hadoop (áp dụng cho HiveServer2) lên 1GB bằng cách thêm vào `~/.bashrc`:
+```bash
+export HADOOP_CLIENT_OPTS="-Xmx1024m"
+```
+Sau đó khởi động lại tiến trình `hiveserver2`.
+
+#### Sự cố 6.11: Streamlit Bị Ẩn Dữ Liệu Lỗi Do Fallback Mock Data
+
+**Triệu chứng:**
+Khi biểu đồ hiển thị, mặc dù Terminal báo Hive Query Failed, màn hình Streamlit vẫn vẽ ra các biểu đồ khá trơn tru. Khi kiểm tra kỹ thì đây lại là dữ liệu tĩnh.
+
+**Nguyên nhân:**
+Hàm `get_df` trong `app.py` có chứa cơ chế `fallback`: `return df if not df.empty else mock_fn()`. Khi query lỗi (ví dụ do vụ OOM phía trên), DataFrame rỗng, Streamlit tự chèn Mock Data. Việc này khiến dev khó kiểm chứng xem dữ liệu Hive có đang load thực tế hay không.
+
+**Giải pháp:**
+Loại bỏ hoàn toàn block fallback trong `src/streamlit_app/app.py`:
+```python
+    def get_df(view_key: str, mock_fn) -> pd.DataFrame:
+        df = data.get(view_key, pd.DataFrame())
+        return df
+```
+Chế độ hiển thị lúc này thành **Strict Mode** (Dữ liệu thật 100% hoặc báo lỗi trực quan).
+
 ### 8.6 Kết quả xác nhận — SHOW VIEWS
 
 ```
@@ -506,6 +579,6 @@ hive -f src/ingest/hive_analytics.sql # Tạo lại 6 OLAP views
 | 6.5 Hive OLAP | Live HDFS data qua Hive CLI, batch query, session cache | ✅ Đạt |
 
 **Tổng số files đã tạo/cập nhật trong toàn bộ Cycle 6:** 7 files  
-**Tổng số sự cố đã xử lý:** 7 (6.1–6.7)  
+**Tổng số sự cố đã xử lý:** 11 (6.1–6.11)  
 **Thời gian load Big Data Reports (lần đầu):** ~1–3 phút (Hive subprocess)  
 **Thời gian load Big Data Reports (lần sau):** Instant (session_state cache)
