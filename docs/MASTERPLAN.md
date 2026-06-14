@@ -45,16 +45,16 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
     4. Test using: `ssh localhost`
   - **DoD**: Command `ssh localhost` executes successfully without prompting for password or passphrase.
 
-- [x] **Task 0.2: Install Java Development Kit (JDK 11)**
+- [x] **Task 0.2: Install Java Development Kit (JDK 8)**
   - **Step-by-Step**:
-    1. Install OpenJDK 11 JDK package: `sudo apt install openjdk-11-jdk -y`
+    1. Install OpenJDK 8 JDK package: `sudo apt install openjdk-8-jdk -y`
     2. Add Java environment variable configuration to shell initialization profile:
        ```bash
-       echo 'export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64' >> ~/.bashrc
+       echo 'export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64' >> ~/.bashrc
        source ~/.bashrc
        ```
   - **Test Command**: `java -version`
-  - **DoD**: Output prints OpenJDK version `11.x.x`.
+  - **DoD**: Output prints OpenJDK version `1.8.x`.
 
 - [x] **Task 0.3: Install and Configure MySQL Server 8.0**
   - **Step-by-Step**:
@@ -99,7 +99,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
        export PATH=$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin
        ```
     3. Modify configuration files in `/usr/local/hadoop/etc/hadoop/`:
-       - `hadoop-env.sh`: Add `export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64`
+       - `hadoop-env.sh`: Add `export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64`
        - `core-site.xml`:
          ```xml
          <configuration>
@@ -167,7 +167,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
   - **Implementation**: Write a shell script (`#!/bin/bash`) that:
     1. Sets up local environment variables:
        ```bash
-       export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+       export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
        export HADOOP_HOME=/usr/local/hadoop
        export PATH=$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin
        ```
@@ -333,7 +333,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
 
 - **Prerequisite Reading**: [GEMINI.md](file:///d:/Project/final-bdes/GEMINI.md#technical-stack-and-version-specifications), [ARCHITECTURE.md](file:///d:/Project/final-bdes/docs/ARCHITECTURE.md#25-data-warehouse-layer)
 
-- [ ] **Task 6.1: Build Streamlit Base Layout**
+- [x] **Task 6.1: Build Streamlit Base Layout**
   - **File**: [app.py](file:///d:/Project/final-bdes/src/streamlit_app/app.py)
   - **Step-by-Step**:
     1. Create a multi-page sidebar layout (pages: Data Management/CRUD, Big Data Reports, Job Execution).
@@ -341,7 +341,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
   - **Test Command**: `streamlit run src/streamlit_app/app.py`
   - **DoD**: The application runs on port 8501 showing structured navigation tabs.
 
-- [ ] **Task 6.2: Create Full MySQL CRUD Interface**
+- [x] **Task 6.2: Create Full MySQL CRUD Interface**
   - **File**: [app.py](file:///d:/Project/final-bdes/src/streamlit_app/app.py)
   - **Step-by-Step**:
     1. Add forms to insert new restaurant listings into MySQL table `restaurants`.
@@ -349,7 +349,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
   - **Test Command**: Insert a test restaurant through the UI, edit its rating, and verify it updates in MySQL via terminal client.
   - **DoD**: Users can perform C, R, U, D operations directly on the screen with instant UI feedback.
 
-- [ ] **Task 6.3: Develop Visualization Page (6 Charts, 3 Types)**
+- [x] **Task 6.3: Develop Visualization Page (6 Charts, 3 Types)**
   - **File**: [app.py](file:///d:/Project/final-bdes/src/streamlit_app/app.py)
   - **Step-by-Step**:
     1. Fetch aggregated MapReduce results from Apache Hive tables.
@@ -360,13 +360,52 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
   - **Test Command**: Load the reports tab and verify charts render with mock data.
   - **DoD**: Screen renders exactly 6 interactive Plotly charts across 3 different visualization types.
 
-- [ ] **Task 6.4: DevOps Operations Triggers**
+- [x] **Task 6.4: DevOps Operations Triggers**
   - **File**: [app.py](file:///d:/Project/final-bdes/src/streamlit_app/app.py)
   - **Step-by-Step**:
     1. Add UI buttons to trigger `db_backup.sh` and execution of MapReduce scripts using `subprocess`.
     2. Print stdout/stderr logs in the UI to notify the developer of success.
   - **Test Command**: Click the backup button and confirm a new sql/bson file is written.
   - **DoD**: Shell scripts run asynchronously from the Streamlit UI, returning successful exit status logs.
+
+- [x] **Task 6.5: Connect Big Data Reports Page to Apache Hive (Live OLAP Queries)**
+  - **Files**:
+    - [app.py](file:///d:/Project/final-bdes/src/streamlit_app/app.py)
+    - [hive_analytics.sql](file:///d:/Project/final-bdes/src/ingest/hive_analytics.sql) *(new)*
+    - [hive_connector.py](file:///d:/Project/final-bdes/src/streamlit_app/hive_connector.py) *(new)*
+  - **Background**: Task 6.3 completed 6 Plotly charts using mock/static DataFrames. The existing `run_hive_query()` function in `app.py` is already scaffolded but never called. The Hive external tables are already defined in `hive_schema.sql` and mapped to HDFS `/data/raw/`. This task replaces mock DataFrames with real Hive OLAP results.
+  - **Step-by-Step**:
+    1. **Create `src/ingest/hive_analytics.sql`**: Define 6 HiveQL analytic views/queries, each mapping to one Plotly chart in the Reports page:
+       - `VIEW_rating_by_district`: `SELECT district, AVG(rating) AS avg_rating, COUNT(*) AS total FROM mysql_restaurants GROUP BY district ORDER BY avg_rating DESC`
+       - `VIEW_cuisine_frequency`: `SELECT category, COUNT(*) AS cnt FROM mongodb_meals GROUP BY category ORDER BY cnt DESC`
+       - `VIEW_price_segment`: `SELECT price_range, COUNT(*) AS cnt FROM mysql_restaurants GROUP BY price_range`
+       - `VIEW_sentiment_by_price`: Join `mysql_reviews` + `mysql_restaurants`, compute AVG rating per `price_range`
+       - `VIEW_review_distribution`: `SELECT rating, COUNT(*) AS cnt FROM mysql_reviews GROUP BY rating ORDER BY rating`
+       - `VIEW_delivery_sentiment`: Classify delivery vs dine-in using keyword matching in `comment` text, compute AVG rating per type
+    2. **Create `src/streamlit_app/hive_connector.py`**: A module encapsulating Hive connection logic with dual-mode support:
+       - **Primary mode**: Use `pyhive` library (`from pyhive import hive`) to connect to HiveServer2 on `localhost:10000` (TCP JDBC-like connection, no subprocess needed).
+       - **Fallback mode**: If `pyhive` connection fails (Hive not running), gracefully fall back to executing `hive -S -e` via `subprocess` (existing `run_hive_query` approach).
+       - **Offline mode**: If both Hive modes fail, return pre-computed seed DataFrames from `src/crawler/seed/` JSON files so the UI never shows blank charts.
+       - Export a single `query_hive(sql: str) -> pd.DataFrame` function.
+    3. **Update `src/streamlit_app/app.py`** — `render_reports_page()` function:
+       - Import `hive_connector.query_hive`
+       - Replace each mock `pd.DataFrame({...})` with a call to `query_hive(<VIEW_SQL>)`
+       - Add a status indicator (badge/spinner) showing "Live Hive Data" or "Offline Mode (Mock Data)" so the user knows the data source at a glance
+       - Wrap all chart rendering in try/except to fall back to mock data gracefully if Hive query returns empty DataFrame
+    4. **Update `requirements.txt`**: Add `pyhive[hive]` and `thrift` dependencies.
+    5. **Validate `hive_schema.sql` tables**: Ensure `mysql_restaurants`, `mysql_reviews`, `mongodb_meals` external tables exist and point to valid HDFS paths before running analytics queries.
+  - **Test Commands**:
+    ```bash
+    # Start HiveServer2 (WSL2)
+    hive --service hiveserver2 &
+    # Wait ~15 seconds then verify port
+    ss -tln | grep 10000
+    # Test pyhive connection
+    python -c "from pyhive import hive; c = hive.connect('localhost'); print('OK')"
+    # Run Streamlit
+    streamlit run src/streamlit_app/app.py
+    ```
+  - **DoD**: The Big Data Reports page displays all 6 Plotly charts populated with live data queried from Apache Hive external tables (backed by HDFS). A data source indicator confirms "Live Hive Data" when HiveServer2 is running. Charts gracefully fall back to offline mock data when Hive is unavailable.
 
 ---
 

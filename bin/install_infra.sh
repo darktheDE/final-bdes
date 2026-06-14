@@ -29,14 +29,14 @@ ssh-keyscan -H 127.0.0.1 >> ~/.ssh/known_hosts
 
 echo "[+] SSH passwordless access configured successfully."
 
-# 2. Java Environments Setup (Java 11 for Hadoop, Java 8 for Hive compatibility)
-echo -e "\n[*] Step 2: Installing Java JDK 11 and JDK 8..."
-sudo apt-get install -y openjdk-11-jdk openjdk-8-jdk
+# 2. Java Environments Setup (Java 8 for Hadoop and Hive compatibility)
+echo -e "\n[*] Step 2: Installing Java JDK 8..."
+sudo apt-get install -y openjdk-8-jdk
 
 # Configure .bashrc paths at the very top to prevent early return blocking
 echo "[*] Adding environment variables to ~/.bashrc..."
 cat << 'EOF' > /tmp/env_vars_temp
-export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 export HADOOP_HOME=/usr/local/hadoop
 export HADOOP_INSTALL=$HADOOP_HOME
 export HADOOP_MAPRED_HOME=$HADOOP_HOME
@@ -168,11 +168,11 @@ cat <<EOT > /usr/local/hadoop/etc/hadoop/mapred-site.xml
 </configuration>
 EOT
 
-# Set up conditional hadoop-env.sh JAVA_HOME
+# Set up hadoop-env.sh JAVA_HOME
 echo "[*] Configuring hadoop-env.sh..."
-sed -i 's|# export JAVA_HOME=|export JAVA_HOME=${JAVA_HOME:-/usr/lib/jvm/java-11-openjdk-amd64}|g' /usr/local/hadoop/etc/hadoop/hadoop-env.sh
+sed -i 's|# export JAVA_HOME=|export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64|g' /usr/local/hadoop/etc/hadoop/hadoop-env.sh
 if ! grep -q "export JAVA_HOME=" /usr/local/hadoop/etc/hadoop/hadoop-env.sh; then
-    echo 'export JAVA_HOME=${JAVA_HOME:-/usr/lib/jvm/java-11-openjdk-amd64}' >> /usr/local/hadoop/etc/hadoop/hadoop-env.sh
+    echo 'export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64' >> /usr/local/hadoop/etc/hadoop/hadoop-env.sh
 fi
 
 # Format HDFS NameNode
@@ -252,8 +252,8 @@ cat <<EOT > /usr/local/hive/conf/hive-site.xml
 </configuration>
 EOT
 
-# Initialize Hive Metastore Schema using Java 8
-echo "[*] Initializing Hive Metastore Schema (Running on Java 8)..."
+# Initialize Hive Metastore Schema
+echo "[*] Initializing Hive Metastore Schema..."
 export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 /usr/local/hive/bin/schematool -dbType mysql -initSchema
 
