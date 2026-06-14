@@ -228,7 +228,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
 
 - **Prerequisite Reading**: [GEMINI.md](file:///d:/Project/final-bdes/GEMINI.md), [ARCHITECTURE.md](file:///d:/Project/final-bdes/docs/ARCHITECTURE.md#3-database-schemas--collections)
 
-- [ ] **Task 4.1: MapReduce Job 1 - Average Rating by District**
+- [x] **Task 4.1: MapReduce Job 1 - Average Rating by District**
   - **File**: [mr_rating_by_district.py](file:///d:/Project/final-bdes/src/mapreduce/mr_rating_by_district.py)
   - **Step-by-Step**:
     1. Read input JSON Lines representing restaurants.
@@ -238,7 +238,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
   - **Test Command**: `python src/mapreduce/mr_rating_by_district.py data/raw/restaurants.jsonl`
   - **DoD**: Outputs list of districts with their average rating and review counts.
 
-- [ ] **Task 4.2: MapReduce Job 2 - Cuisine Frequency Counter**
+- [x] **Task 4.2: MapReduce Job 2 - Cuisine Frequency Counter**
   - **File**: [mr_cuisine_count.py](file:///d:/Project/final-bdes/src/mapreduce/mr_cuisine_count.py)
   - **Step-by-Step**:
     1. Read input JSON Lines representing meals.
@@ -248,7 +248,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
   - **Test Command**: `python src/mapreduce/mr_cuisine_count.py data/raw/meals.jsonl`
   - **DoD**: Returns a sorted frequency distribution of cuisine/category tags.
 
-- [ ] **Task 4.3: MapReduce Job 3 - Price Category Distribution**
+- [x] **Task 4.3: MapReduce Job 3 - Price Category Distribution**
   - **File**: [mr_price_segment.py](file:///d:/Project/final-bdes/src/mapreduce/mr_price_segment.py)
   - **Step-by-Step**:
     1. Read TripAdvisor restaurants.
@@ -258,7 +258,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
   - **Test Command**: `python src/mapreduce/mr_price_segment.py data/raw/restaurants.jsonl`
   - **DoD**: Aggregates total restaurant count by price category.
 
-- [ ] **Task 4.4: MapReduce Job 4 - Review Sentiment Analysis**
+- [x] **Task 4.4: MapReduce Job 4 - Review Sentiment Analysis**
   - **File**: [mr_sentiment_analysis.py](file:///d:/Project/final-bdes/src/mapreduce/mr_sentiment_analysis.py)
   - **Step-by-Step**:
     1. Parse the TripAdvisor nested reviews structure.
@@ -268,7 +268,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
   - **Test Command**: `python src/mapreduce/mr_sentiment_analysis.py data/raw/restaurants.jsonl`
   - **DoD**: Emits sentiment scores and positive/negative ratios per restaurant.
 
-- [ ] **Task 4.5: MapReduce Job 5 - Meal-to-Restaurant Ingredient Matching**
+- [x] **Task 4.5: MapReduce Job 5 - Meal-to-Restaurant Ingredient Matching**
   - **File**: [mr_ingredient_match.py](file:///d:/Project/final-bdes/src/mapreduce/mr_ingredient_match.py)
   - **Step-by-Step**:
     1. Read meals (ingredients list) and restaurant comments.
@@ -277,7 +277,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
   - **Test Command**: `python src/mapreduce/mr_ingredient_match.py data/raw/restaurants.jsonl data/raw/meals.jsonl`
   - **DoD**: Yields match frequencies of meal ingredients in restaurant reviews.
 
-- [ ] **Task 4.6: MapReduce Job 6 - Top 10 Most Reviewed Restaurants**
+- [x] **Task 4.6: MapReduce Job 6 - Top 10 Most Reviewed Restaurants**
   - **File**: [mr_top_reviewed.py](file:///d:/Project/final-bdes/src/mapreduce/mr_top_reviewed.py)
   - **Step-by-Step**:
     1. Map restaurant name/id to their `review_count`.
@@ -285,7 +285,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
   - **Test Command**: `python src/mapreduce/mr_top_reviewed.py data/raw/restaurants.jsonl`
   - **DoD**: Outputs top 10 restaurants sorted by review count.
 
-- [ ] **Task 4.7: MapReduce Job 7 - Review Distribution Profile**
+- [x] **Task 4.7: MapReduce Job 7 - Review Distribution Profile**
   - **File**: [mr_review_distribution.py](file:///d:/Project/final-bdes/src/mapreduce/mr_review_distribution.py)
   - **Step-by-Step**:
     1. Parse review ratings (1.0 to 5.0) from reviews array.
@@ -294,7 +294,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
   - **Test Command**: `python src/mapreduce/mr_review_distribution.py data/raw/restaurants.jsonl`
   - **DoD**: Returns distribution counts of review stars.
 
-- [ ] **Task 4.8: MapReduce Job 8 - Delivery Status Analysis**
+- [x] **Task 4.8: MapReduce Job 8 - Delivery Status Analysis**
   - **File**: [mr_delivery_analysis.py](file:///d:/Project/final-bdes/src/mapreduce/mr_delivery_analysis.py)
   - **Step-by-Step**:
     1. Classify restaurants based on delivery keywords in comments/description.
@@ -310,7 +310,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
 
 - **Prerequisite Reading**: [TROUBLESHOOTING.md](file:///d:/Project/final-bdes/docs/TROUBLESHOOTING.md), [GEMINI.md](file:///d:/Project/final-bdes/GEMINI.md)
 
-- [ ] **Task 5.1: Automate MongoDB & MySQL Backup & Restore**
+- [x] **Task 5.1: Automate MongoDB & MySQL Backup & Restore**
   - **Files**: [db_backup.sh](file:///d:/Project/final-bdes/src/backup/db_backup.sh) / [db_restore.sh](file:///d:/Project/final-bdes/src/backup/db_restore.sh)
   - **Step-by-Step**:
     1. Write `db_backup.sh` to run `mysqldump` and `mongodump`, outputting to a timestamped folder in `/data/backups/`.
@@ -318,7 +318,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
   - **Test Command**: `bash src/backup/db_backup.sh` then check `/data/backups/`. Test recovery with `bash src/backup/db_restore.sh <backup_folder>`.
   - **DoD**: Backups generate files with non-zero sizes; restore successfully recovers mock data after simulated drops.
 
-- [ ] **Task 5.2: Port & Service Checks**
+- [x] **Task 5.2: Port & Service Checks**
   - **File**: [run.sh](file:///d:/Project/final-bdes/bin/run.sh)
   - **Step-by-Step**:
     1. Integrate active socket detection checks (`ss -tln` or `netstat`) inside `bin/run.sh`.

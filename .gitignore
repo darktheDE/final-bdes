@@ -116,3 +116,12 @@ airflow-webserver.pid
 secrets/
 credentials.json
 service-account.json
+
+# =========================
+# Project Specific Exclusions
+# =========================
+data/backups/
+data/db/
+data/hdfs/
+data/raw/
+tmp-pandas/

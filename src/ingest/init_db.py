@@ -42,13 +42,13 @@ def create_tables(mysql_conn):
     tables = {}
     tables['restaurants'] = (
         "CREATE TABLE IF NOT EXISTS `restaurants` ("
-        "  `id` varchar(150) NOT NULL,"
+        "  `id` varchar(255) NOT NULL,"
         "  `name` varchar(255) NOT NULL,"
         "  `rating` float DEFAULT NULL,"
         "  `review_count` int DEFAULT 0,"
         "  `address` varchar(500) DEFAULT NULL,"
-        "  `district` varchar(100) DEFAULT 'Unknown',"
-        "  `city` varchar(100) DEFAULT 'Unknown',"
+        "  `district` varchar(255) DEFAULT 'Unknown',"
+        "  `city` varchar(255) DEFAULT 'Unknown',"
         "  `price_range` varchar(50) DEFAULT NULL,"
         "  PRIMARY KEY (`id`)"
         ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"
@@ -57,7 +57,7 @@ def create_tables(mysql_conn):
     tables['reviews'] = (
         "CREATE TABLE IF NOT EXISTS `reviews` ("
         "  `id` int NOT NULL AUTO_INCREMENT,"
-        "  `restaurant_id` varchar(150) NOT NULL,"
+        "  `restaurant_id` varchar(255) NOT NULL,"
         "  `user` varchar(255) DEFAULT 'Anonymous',"
         "  `rating` float DEFAULT NULL,"
         "  `comment` text DEFAULT NULL,"
@@ -69,7 +69,7 @@ def create_tables(mysql_conn):
     
     tables['meals'] = (
         "CREATE TABLE IF NOT EXISTS `meals` ("
-        "  `id` varchar(150) NOT NULL,"
+        "  `id` varchar(255) NOT NULL,"
         "  `name` varchar(255) NOT NULL,"
         "  `category` varchar(100) DEFAULT 'Unknown',"
         "  `area` varchar(100) DEFAULT 'Unknown',"
