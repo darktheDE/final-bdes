@@ -8,6 +8,6 @@ pandas==2.2.0
 plotly==5.18.0
 mysql-connector-python==8.3.0
 # Apache Hive connectivity (HiveServer2 TCP via pyhive)
-pyhive[hive]>=0.7.0
+pyhive>=0.7.0
 thrift>=0.16.0
 thrift-sasl>=0.4.3
