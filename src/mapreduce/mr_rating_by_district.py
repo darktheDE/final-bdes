@@ -1,8 +1,23 @@
 import json
+import os
+import sys
 
 from mrjob.job import MRJob
 
-from location_utils import extract_admin_area
+# location_utils.py must be distributed to YARN workers via --file.
+# Attempt import; define inline fallback so the job fails clearly if missing.
+try:
+    from location_utils import extract_admin_area
+except ImportError:
+    # Add the directory of this script to sys.path as a fallback
+    _here = os.path.dirname(os.path.abspath(__file__))
+    if _here not in sys.path:
+        sys.path.insert(0, _here)
+    try:
+        from location_utils import extract_admin_area
+    except ImportError:
+        def extract_admin_area(*args):
+            return "Unknown"
 
 
 def _extract_district(*location_parts: str) -> str:

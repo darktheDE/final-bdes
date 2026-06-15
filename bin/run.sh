@@ -51,6 +51,9 @@ export HIVE_HOME="/usr/local/hive"
 export HADOOP_CLIENT_OPTS="-Xmx1024m $HADOOP_CLIENT_OPTS"
 # Prepend JAVA_HOME/bin so it takes priority over system java in PATH
 export PATH="${JAVA_HOME}/bin:${PATH}:${HADOOP_HOME}/bin:${HADOOP_HOME}/sbin:${HIVE_HOME}/bin"
+# Add HCatalog jar to HADOOP_CLASSPATH so JsonSerDe is available in YARN MR tasks
+export HADOOP_CLASSPATH="${HIVE_HOME}/lib/hive-hcatalog-core-3.1.3.jar:${HIVE_HOME}/lib/hive-exec-3.1.3.jar:${HADOOP_CLASSPATH}"
+
 
 # ── Version check — fail fast if infra not matching ───────────────────────────
 echo "[0/4] Verifying required tech stack versions..."

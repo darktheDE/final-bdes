@@ -40,4 +40,26 @@
         <name>hive.stats.autogather</name>
         <value>false</value>
     </property>
+
+    <!-- Disable impersonation to avoid proxyuser errors in WSL -->
+    <property>
+        <name>hive.server2.enable.doAs</name>
+        <value>false</value>
+    </property>
+
+    <!-- Add HCatalog jar so JsonSerDe is available in MR tasks -->
+    <property>
+        <name>hive.aux.jars.path</name>
+        <value>file:///usr/local/hive/lib/hive-hcatalog-core-3.1.3.jar</value>
+    </property>
+
+    <!-- Use local mode for small queries to avoid MR overhead and ClassPath issues -->
+    <property>
+        <name>hive.exec.mode.local.auto</name>
+        <value>true</value>
+    </property>
+    <property>
+        <name>hive.exec.mode.local.auto.inputbytes.max</name>
+        <value>134217728</value>
+    </property>
 </configuration>

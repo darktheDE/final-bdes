@@ -206,14 +206,17 @@ cp "${BASE_DIR}/conf/hadoop/yarn-site.xml"  "${HADOOP_HOME}/etc/hadoop/yarn-site
 cp "${BASE_DIR}/conf/hadoop/mapred-site.xml" "${HADOOP_HOME}/etc/hadoop/mapred-site.xml"
 echo "[+] Hadoop config copied."
 
-# Set JAVA_HOME in hadoop-env.sh
+# Set JAVA_HOME and HADOOP_CLASSPATH in hadoop-env.sh
 HADOOP_ENV="${HADOOP_HOME}/etc/hadoop/hadoop-env.sh"
 if ! grep -q "^export JAVA_HOME=/usr/lib/jvm/java-1.8.0" "${HADOOP_ENV}"; then
     # Remove any existing export JAVA_HOME line to avoid duplicates
     sed -i '/^export JAVA_HOME=/d' "${HADOOP_ENV}"
     echo 'export JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64' >> "${HADOOP_ENV}"
 fi
-echo "[+] hadoop-env.sh JAVA_HOME configured."
+if ! grep -q "HADOOP_CLASSPATH=\$HADOOP_CLASSPATH:/usr/local/hive/lib/hive-hcatalog-core" "${HADOOP_ENV}"; then
+    echo 'export HADOOP_CLASSPATH=$HADOOP_CLASSPATH:/usr/local/hive/lib/hive-hcatalog-core-3.1.3.jar:/usr/local/hive/lib/hive-exec-3.1.3.jar' >> "${HADOOP_ENV}"
+fi
+echo "[+] hadoop-env.sh JAVA_HOME and CLASSPATH configured."
 
 # Format NameNode only if it has never been formatted
 HDFS_DATA_DIR="${HOME}/hadoop-data"
@@ -287,17 +290,26 @@ else
     echo "[+] Guava already fixed or source not found (skipping)."
 fi
 
+# Fix HCatalog JsonSerDe dependency for MapReduce tasks
+echo "[*] Symlinking Hive HCatalog to Hadoop lib (fixes ClassNotFoundException)..."
+sudo ln -sf /usr/local/hive/lib/hive-hcatalog-core-3.1.3.jar /usr/local/hadoop/share/hadoop/common/lib/
+sudo ln -sf /usr/local/hive/lib/hive-exec-3.1.3.jar /usr/local/hadoop/share/hadoop/common/lib/
+echo "[+] HCatalog jars symlinked."
+
 # Copy hive-site.xml from project conf/
 echo "[*] Copying hive-site.xml from conf/hive/ ..."
 cp "${BASE_DIR}/conf/hive/hive-site.xml" "${HIVE_HOME}/conf/hive-site.xml"
 echo "[+] hive-site.xml copied."
 
-# Initialize Hive Metastore schema (idempotent — will skip if already initialized)
+# Initialize Hive Metastore schema (idempotent)
 echo "[*] Initializing Hive Metastore schema in MySQL..."
 export JAVA_HOME="${JAVA8_PATH}"
-"${HIVE_HOME}/bin/schematool" -dbType mysql -initSchema 2>&1 \
-    | grep -v "SLF4J" || true
-echo "[+] Hive Metastore initialized."
+if ! "${HIVE_HOME}/bin/schematool" -dbType mysql -info 2>/dev/null | grep -q "Metastore schema version"; then
+    "${HIVE_HOME}/bin/schematool" -dbType mysql -initSchema 2>&1 | grep -v "SLF4J" || true
+    echo "[+] Hive Metastore initialized."
+else
+    echo "[+] Hive Metastore schema already initialized."
+fi
 
 # Create HDFS warehouse directory
 "${HADOOP_HOME}/bin/hdfs" dfs -mkdir -p /user/hive/warehouse 2>/dev/null || true

@@ -90,28 +90,62 @@ _OFFLINE_MOCK_DATA: dict[str, pd.DataFrame] = {
 
 
 def _probe_hiveserver2() -> bool:
-    """Return True if HiveServer2 is reachable on localhost:10000 via pyhive."""
+    """Return True if HiveServer2 can execute a real JsonSerDe query via pyhive.
+
+    Tests with an actual COUNT(*) query on a JsonSerDe external table — not just
+    SELECT 1 — because HiveServer2 may connect fine but fail at MR execution time
+    due to missing HCatalog jars in YARN container classpath.
+    """
     try:
         from pyhive import hive  # type: ignore
         conn = hive.connect(host="localhost", port=10000, database="food_sentiment_db")
         cursor = conn.cursor()
-        cursor.execute("SELECT 1")
+        cursor.execute("set hive.exec.mode.local.auto=true")
+        cursor.execute("set hive.exec.mode.local.auto.inputbytes.max=134217728")
+        cursor.execute("set hive.aux.jars.path=file:///usr/local/hive/lib/hive-hcatalog-core-3.1.3.jar")
+        # Real test: query a JsonSerDe external table
+        cursor.execute("SELECT COUNT(*) FROM mysql_restaurants")
+        result = cursor.fetchone()
         cursor.close()
         conn.close()
-        return True
+        return result is not None and result[0] > 0
     except Exception as exc:
         logger.debug("pyhive probe failed: %s", exc)
         return False
 
 
+def _get_hive_bin() -> str:
+    """Resolve the absolute path to the hive CLI binary.
+
+    Tries common install paths in case Streamlit is launched without
+    /usr/local/hive/bin on PATH (e.g. via bin/run.sh subprocess).
+    """
+    import shutil
+    # Try system PATH first
+    hive_cmd = shutil.which("hive")
+    if hive_cmd:
+        return hive_cmd
+    # Common install paths
+    for candidate in [
+        "/usr/local/hive/bin/hive",
+        "/usr/bin/hive",
+        "/opt/hive/bin/hive",
+    ]:
+        import os
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+    return "hive"  # fallback — will fail with FileNotFoundError if missing
+
+
 def _probe_hive_cli() -> bool:
     """Return True if `hive` CLI binary is accessible and Hive metastore responds."""
     try:
+        hive_bin = _get_hive_bin()
         result = subprocess.run(
-            ["hive", "-S", "-e", "USE food_sentiment_db; SELECT 1;"],
+            [hive_bin, "-S", "-e", "USE food_sentiment_db; SELECT COUNT(*) FROM mysql_restaurants;"],
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=60,
         )
         return result.returncode == 0
     except Exception as exc:
@@ -124,22 +158,24 @@ def get_hive_status() -> str:
     Detect and cache the best available Hive connection mode.
 
     Returns:
-        "live"       — pyhive connected to HiveServer2 successfully.
-        "subprocess" — Hive CLI available but HiveServer2 not running.
+        "live"       — pyhive connected to HiveServer2 and can run JsonSerDe queries.
+        "subprocess" — Hive CLI available and working.
         "offline"    — Neither mode available; will use mock data.
     """
     global _HIVE_MODE
     if _HIVE_MODE is not None:
         return _HIVE_MODE
 
-    if _probe_hiveserver2():
-        _HIVE_MODE = "live"
-    elif _probe_hive_cli():
+    # Prefer subprocess CLI — it reliably uses local mode and avoids YARN classpath issues
+    if _probe_hive_cli():
         _HIVE_MODE = "subprocess"
+    elif _probe_hiveserver2():
+        _HIVE_MODE = "live"
     else:
         _HIVE_MODE = "offline"
 
     logger.info("Hive connection mode resolved: %s", _HIVE_MODE)
+    return _HIVE_MODE
     return _HIVE_MODE
 
 
@@ -158,6 +194,8 @@ def _query_via_pyhive(sql: str, database: str) -> pd.DataFrame:
         # SET phải chạy trên cùng cursor với query để có hiệu lực
         cursor.execute("set hive.exec.mode.local.auto=true")
         cursor.execute("set hive.exec.mode.local.auto.inputbytes.max=134217728")
+        cursor.execute("set hive.exec.mode.local.auto.tasks.max=4")
+        cursor.execute("set hive.aux.jars.path=file:///usr/local/hive/lib/hive-hcatalog-core-3.1.3.jar")
         cursor.execute(sql)
         rows = cursor.fetchall()
         if not rows:
@@ -171,23 +209,29 @@ def _query_via_pyhive(sql: str, database: str) -> pd.DataFrame:
 
 def _query_via_subprocess(sql: str, database: str) -> pd.DataFrame:
     """Execute SQL through `hive -S -e` subprocess and parse TSV output."""
+    hive_bin = _get_hive_bin()
     full_sql = f"set hive.exec.mode.local.auto=true; set hive.cli.print.header=true; USE {database}; {sql}"
     result = subprocess.check_output(
-        ["hive", "-S", "-e", full_sql],
+        [hive_bin, "-S", "-e", full_sql],
         stderr=subprocess.STDOUT,
         timeout=HIVE_QUERY_TIMEOUT,
     )
     output = result.decode("utf-8", errors="replace")
 
-    # Filter out SLF4J noise, Hadoop INFO lines, and blank lines
+    # Filter out all noise lines — any line that isn't actual TSV data/header
+    _NOISE_PREFIXES = (
+        "SLF4J", "WARN", "INFO", "log4j", "Hive Session", "Logging",
+        "OK", "Time taken", "your ",          # tty bogus screen size warning
+        "Ended Job", "Error during", "Examining",
+        "Task with", "Task ID", "URL:", "-----", "Diagnostic",
+        "Caused by", "at ", "FAILED:", "Exception",
+    )
     clean_lines = [
         line for line in output.split("\n")
         if line.strip()
-        and not line.startswith("SLF4J")
-        and not line.startswith("WARN")
-        and not line.startswith("INFO")
-        and not line.startswith("log4j")
-        and not line.startswith("Hive Session")
+        and not any(line.startswith(p) for p in _NOISE_PREFIXES)
+        and "bogus" not in line
+        and "expect trouble" not in line
     ]
     clean_output = "\n".join(clean_lines)
 
@@ -198,6 +242,7 @@ def _query_via_subprocess(sql: str, database: str) -> pd.DataFrame:
     # Strip table-prefix from column names (hive CLI may return "view.col")
     df.columns = [c.split(".")[-1] for c in df.columns]
     return df
+
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -227,9 +272,10 @@ BATCH_QUERIES: list[tuple[str, str]] = [
 
 def batch_query_all_views(use_mock_data: bool = False) -> dict[str, pd.DataFrame]:
     """
-    Run all 6 analytics views in a single Hive subprocess call.
+    Run all 6 analytics views and return a dict mapping view_key -> pd.DataFrame.
 
-    Returns a dict mapping view_key -> pd.DataFrame.
+    Each view is queried individually to avoid batch parsing issues where one
+    failing query contaminates subsequent queries' output.
     """
     if use_mock_data:
         return {key: df.copy() for key, df in _OFFLINE_MOCK_DATA.items()}
@@ -239,73 +285,20 @@ def batch_query_all_views(use_mock_data: bool = False) -> dict[str, pd.DataFrame
     if mode == "offline":
         return {key: pd.DataFrame() for key, _ in BATCH_QUERIES}
 
-    if mode == "live":
-        # pyhive: still run individually (connection reuse is handled by the driver)
-        results: dict[str, pd.DataFrame] = {}
-        for key, sql in BATCH_QUERIES:
-            try:
-                df = _query_via_pyhive(sql, "food_sentiment_db")
-                results[key] = df if (df is not None and not df.empty) else pd.DataFrame()
-            except Exception as exc:
-                logger.warning("pyhive batch query failed for %s: %s", key, exc)
-                results[key] = pd.DataFrame()
-        return results
+    results: dict[str, pd.DataFrame] = {}
 
-    # subprocess mode: build one big script with SELECT statements separated
-    # by a !echo sentinel so we can split the output back into 6 blocks.
-    sql_parts = []
-    for i, (key, sql) in enumerate(BATCH_QUERIES):
-        sql_parts.append(f"set hive.cli.print.header=true;")
-        sql_parts.append(f"{sql};")
-        if i < len(BATCH_QUERIES) - 1:
-            sql_parts.append(f"!echo {_BATCH_SEP};")
-
-    full_sql = f"set hive.exec.mode.local.auto=true; USE food_sentiment_db; " + " ".join(sql_parts)
-
-    try:
-        proc = subprocess.run(
-            ["hive", "-S", "-e", full_sql],
-            capture_output=True,
-            text=True,
-            timeout=HIVE_QUERY_TIMEOUT,
-        )
-        raw = proc.stdout + proc.stderr
-    except subprocess.TimeoutExpired:
-        logger.warning("Batch Hive query timed out after %ds", HIVE_QUERY_TIMEOUT)
-        return {key: pd.DataFrame() for key, _ in BATCH_QUERIES}
-    except Exception as exc:
-        logger.warning("Batch Hive query failed: %s", exc)
-        return {key: pd.DataFrame() for key, _ in BATCH_QUERIES}
-
-    # Split output on sentinel
-    blocks = raw.split(_BATCH_SEP)
-
-    results = {}
-    for i, (key, _) in enumerate(BATCH_QUERIES):
-        block = blocks[i] if i < len(blocks) else ""
-        # Filter noise
-        clean_lines = [
-            line for line in block.split("\n")
-            if line.strip()
-            and not line.startswith("SLF4J")
-            and not line.startswith("WARN")
-            and not line.startswith("INFO")
-            and not line.startswith("log4j")
-            and not line.startswith("Hive Session")
-            and not line.startswith("Logging")
-            and not line.startswith("OK")
-            and not line.startswith("Time taken")
-        ]
-        clean_block = "\n".join(clean_lines)
+    for key, sql in BATCH_QUERIES:
         try:
-            if clean_block.strip():
-                df = pd.read_csv(StringIO(clean_block), sep="\t")
-                df.columns = [c.split(".")[-1] for c in df.columns]
-                results[key] = df if not df.empty else pd.DataFrame()
+            if mode == "live":
+                df = _query_via_pyhive(sql, "food_sentiment_db")
             else:
-                results[key] = pd.DataFrame()
+                df = _query_via_subprocess(sql, "food_sentiment_db")
+
+            results[key] = df if (df is not None and not df.empty) else pd.DataFrame()
         except Exception as exc:
-            logger.warning("Failed to parse block for %s: %s", key, exc)
+            logger.warning("Hive query failed for %s (%s mode): %s", key, mode, exc)
+            import traceback
+            logger.warning(traceback.format_exc())
             results[key] = pd.DataFrame()
 
     return results

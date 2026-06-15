@@ -69,26 +69,27 @@ DROP VIEW IF EXISTS view_rating_histogram;
 CREATE VIEW view_rating_histogram AS
 SELECT
     CASE
-        WHEN rating < 2.0 THEN '1-2 sao (Kém)'
-        WHEN rating < 3.0 THEN '2-3 sao (Dưới TB)'
-        WHEN rating < 4.0 THEN '3-4 sao (Trung bình)'
-        WHEN rating < 4.5 THEN '4-4.5 sao (Tốt)'
-        WHEN rating <= 5.0 THEN '4.5-5 sao (Xuất sắc)'
-        ELSE 'Chưa có đánh giá'
+        WHEN rating < 2.0 THEN '1-2 sao (Kem)'
+        WHEN rating < 3.0 THEN '2-3 sao (Duoi TB)'
+        WHEN rating < 4.0 THEN '3-4 sao (Trung binh)'
+        WHEN rating < 4.5 THEN '4-4.5 sao (Tot)'
+        WHEN rating <= 5.0 THEN '4.5-5 sao (Xuat sac)'
+        ELSE 'Chua co danh gia'
     END AS rating_group,
     COUNT(*) AS restaurant_count
 FROM mysql_restaurants
 WHERE rating IS NOT NULL
 GROUP BY
     CASE
-        WHEN rating < 2.0 THEN '1-2 sao (Kém)'
-        WHEN rating < 3.0 THEN '2-3 sao (Dưới TB)'
-        WHEN rating < 4.0 THEN '3-4 sao (Trung bình)'
-        WHEN rating < 4.5 THEN '4-4.5 sao (Tốt)'
-        WHEN rating <= 5.0 THEN '4.5-5 sao (Xuất sắc)'
-        ELSE 'Chưa có đánh giá'
+        WHEN rating < 2.0 THEN '1-2 sao (Kem)'
+        WHEN rating < 3.0 THEN '2-3 sao (Duoi TB)'
+        WHEN rating < 4.0 THEN '3-4 sao (Trung binh)'
+        WHEN rating < 4.5 THEN '4-4.5 sao (Tot)'
+        WHEN rating <= 5.0 THEN '4.5-5 sao (Xuat sac)'
+        ELSE 'Chua co danh gia'
     END
 ORDER BY restaurant_count DESC;
+
 
 
 -- ────────────────────────────────────────────────────────────
@@ -108,8 +109,7 @@ WHERE district_parsed IS NOT NULL
   AND district_parsed != 'Unknown'
   AND district_parsed != ''
 GROUP BY district_parsed
-ORDER BY restaurant_count DESC
-LIMIT 20;
+ORDER BY restaurant_count DESC;
 
 
 -- ────────────────────────────────────────────────────────────
