@@ -202,21 +202,26 @@ def main():
     print("=== TheMealDB Ingestion Script ===")
     meals_data, categories, areas, ingredients = None, None, None, None
     
-    try:
-        # 1. Try to fetch from API
-        meals_data, categories, areas, ingredients = fetch_from_api()
-        # 2. Save to seed as backup
-        if meals_data:
-            save_to_seed(meals_data, "meals.json")
-        if categories: save_to_seed(categories, "categories.json")
-        if areas: save_to_seed(areas, "areas.json")
-        if ingredients: save_to_seed(ingredients, "ingredients.json")
-            
-    except Exception as e:
-        print(f"\n[!] Network error encountered: {e}")
-        print("[!] Engaging Offline Fallback Mechanism...\n")
-        
-        # 3. Offline Fallback
+    # Default is offline mode (load from local seed data)
+    if "--online" in sys.argv:
+        print("[*] Online Mode — Attempting to fetch meals from TheMealDB API...")
+        try:
+            # 1. Try to fetch from API
+            meals_data, categories, areas, ingredients = fetch_from_api()
+            # 2. Save to seed as backup
+            if meals_data:
+                save_to_seed(meals_data, "meals.json")
+            if categories: save_to_seed(categories, "categories.json")
+            if areas: save_to_seed(areas, "areas.json")
+            if ingredients: save_to_seed(ingredients, "ingredients.json")
+                
+        except Exception as e:
+            print(f"\n[!] Network error encountered: {e}")
+            print("[!] Engaging Offline Fallback Mechanism...\n")
+            # 3. Offline Fallback
+            meals_data, categories, areas, ingredients = load_from_seed()
+    else:
+        print("[*] Loading from local seed data directly (Offline Mode).")
         meals_data, categories, areas, ingredients = load_from_seed()
         
     if not meals_data:

@@ -192,22 +192,20 @@ source "${VENV_DIR}/bin/activate"
 # ── Data Collection (only if --crawl) ─────────────────────────────────────────
 echo -e "\n[2/4] Data collection..."
 if [ "${CRAWL}" = true ]; then
-    echo "  [--crawl] Fetching fresh data from external sources..."
+    echo "  [--crawl] Importing local offline data..."
 
-    # TheMealDB API
-    echo "  -> Fetching TheMealDB recipes..."
-    python src/crawler/fetch_mealdb.py \
-        || echo "    [!] fetch_mealdb.py encountered errors (offline seed data may be used)."
+    # TheMealDB Seed Data
+    echo "  -> Loading local TheMealDB recipes..."
+    python src/crawler/fetch_mealdb.py --offline \
+        || echo "    [!] fetch_mealdb.py failed."
 
-    # TripAdvisor Scrapy spider
-    echo "  -> Running TripAdvisor scraper..."
-    cd src/crawler/tripadvisor_job
-    scrapy crawl tripadvisor \
-        || echo "    [!] Scrapy crawler failed or was skipped (offline seed data used)."
-    cd "${BASE_DIR}"
+    # TripAdvisor Offline JSON
+    echo "  -> Loading local TripAdvisor JSON..."
+    python src/ingest/import_tripadvisor.py \
+        || echo "    [!] import_tripadvisor.py failed."
 
     # Normalize and load into MySQL
-    echo "  -> Normalizing and loading data into MySQL (init_db.py)..."
+    echo "  -> Normalizing and migrating data to MySQL (init_db.py)..."
     python src/ingest/init_db.py \
         || echo "    [!] init_db.py failed — check MySQL connection."
 
@@ -220,7 +218,7 @@ if [ "${CRAWL}" = true ]; then
     python src/ingest/mysql_to_hdfs.py \
         || echo "    [!] mysql_to_hdfs.py failed — check HDFS status."
 else
-    echo "  [*] Skipping data collection (use --crawl to fetch fresh data)."
+    echo "  [*] Skipping data import (use --crawl to re-import and sync local data)."
 fi
 
 # ── MapReduce Jobs (only if --jobs) ───────────────────────────────────────────

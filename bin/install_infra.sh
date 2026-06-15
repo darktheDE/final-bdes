@@ -342,7 +342,13 @@ runners:
 EOF
 
 # Initialize database schemas with seed data
-echo "[*] Running init_db.py to initialize MySQL schema and load seed data..."
+echo "[*] Importing offline TripAdvisor data to MongoDB..."
+python "${BASE_DIR}/src/ingest/import_tripadvisor.py" || echo "[!] import_tripadvisor.py failed."
+
+echo "[*] Loading offline meals data to MongoDB..."
+python "${BASE_DIR}/src/crawler/fetch_mealdb.py" --offline || echo "[!] fetch_mealdb.py failed."
+
+echo "[*] Running init_db.py to initialize MySQL schema and migrate data..."
 python "${BASE_DIR}/src/ingest/init_db.py" || echo "[!] init_db.py failed — run manually after services are ready."
 
 # ──────────────────────────────────────────────────────────────────────────────
