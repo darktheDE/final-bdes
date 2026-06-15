@@ -204,7 +204,6 @@ def _query_via_pyhive(sql: str, database: str) -> pd.DataFrame:
         # SET phải chạy trên cùng cursor với query để có hiệu lực
         cursor.execute("set hive.exec.mode.local.auto=true")
         cursor.execute("set hive.exec.mode.local.auto.inputbytes.max=134217728")
-        cursor.execute("set hive.exec.mode.local.auto.tasks.max=4")
         cursor.execute("set hive.aux.jars.path=file:///usr/local/hive/lib/hive-hcatalog-core-3.1.3.jar")
         cursor.execute(sql)
         rows = cursor.fetchall()
