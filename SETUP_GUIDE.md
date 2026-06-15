@@ -22,7 +22,13 @@ Chạy lệnh sau tại thư mục gốc của dự án:
 chmod +x bin/*.sh src/backup/*.sh
 ```
 
-### Bước 2.2: Cài đặt và cấu hình Hạ tầng Dữ liệu lớn
+### Bước 2.2: Sửa lỗi ký tự xuống dòng (CRLF to LF)
+Nếu bạn clone repo này trên Windows trước khi chạy trên WSL2, các file script có thể đã bị tự động chuyển đổi định dạng xuống dòng sang Windows (CRLF). Hãy chuyển đổi chúng về định dạng Linux (LF) bằng cách chạy lệnh:
+```bash
+sed -i 's/\r$//' bin/*.sh src/backup/*.sh
+```
+
+### Bước 2.3: Cài đặt và cấu hình Hạ tầng Dữ liệu lớn
 Chạy script cài đặt toàn bộ hạ tầng (chỉ chạy 1 lần duy nhất trên máy mới):
 ```bash
 ./bin/install_infra.sh
@@ -38,7 +44,7 @@ Chạy script cài đặt toàn bộ hạ tầng (chỉ chạy 1 lần duy nhấ
 8. Tải và cấu hình Apache Hive 3.1.3, tải MySQL JDBC Connector, khắc phục lỗi thư viện Guava.
 9. Khởi tạo Database cho Hive Metastore Schema và chạy `src/ingest/init_db.py` để nạp dữ liệu mẫu ban đầu từ thư mục `src/crawler/seed/`.
 
-### Bước 2.3: Reload biến môi trường
+### Bước 2.4: Reload biến môi trường
 Sau khi `install_infra.sh` hoàn thành, bạn **cần nạp lại (reload) biến môi trường** của terminal hiện tại để áp dụng các thay đổi:
 ```bash
 source ~/.bashrc
