@@ -89,26 +89,27 @@ _OFFLINE_MOCK_DATA: dict[str, pd.DataFrame] = {
 }
 
 
-def _probe_hiveserver2() -> bool:
-    """Return True if HiveServer2 can execute a real JsonSerDe query via pyhive.
+def is_port_open(host: str, port: int, timeout: float = 1.0) -> bool:
+    """Quick check if a TCP port is open on host."""
+    import socket
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
 
-    Tests with an actual COUNT(*) query on a JsonSerDe external table — not just
-    SELECT 1 — because HiveServer2 may connect fine but fail at MR execution time
-    due to missing HCatalog jars in YARN container classpath.
-    """
+
+def _probe_hiveserver2() -> bool:
+    """Return True if HiveServer2 is running and responsive."""
     try:
         from pyhive import hive  # type: ignore
         conn = hive.connect(host="localhost", port=10000, database="food_sentiment_db")
         cursor = conn.cursor()
-        cursor.execute("set hive.exec.mode.local.auto=true")
-        cursor.execute("set hive.exec.mode.local.auto.inputbytes.max=134217728")
-        cursor.execute("set hive.aux.jars.path=file:///usr/local/hive/lib/hive-hcatalog-core-3.1.3.jar")
-        # Real test: query a JsonSerDe external table
-        cursor.execute("SELECT COUNT(*) FROM mysql_restaurants")
+        cursor.execute("SELECT 1")
         result = cursor.fetchone()
         cursor.close()
         conn.close()
-        return result is not None and result[0] > 0
+        return result is not None
     except Exception as exc:
         logger.debug("pyhive probe failed: %s", exc)
         return False
@@ -142,10 +143,10 @@ def _probe_hive_cli() -> bool:
     try:
         hive_bin = _get_hive_bin()
         result = subprocess.run(
-            [hive_bin, "-S", "-e", "USE food_sentiment_db; SELECT COUNT(*) FROM mysql_restaurants;"],
+            [hive_bin, "-S", "-e", "SHOW TABLES;"],
             capture_output=True,
             text=True,
-            timeout=60,
+            timeout=10,
         )
         return result.returncode == 0
     except Exception as exc:
@@ -166,11 +167,20 @@ def get_hive_status() -> str:
     if _HIVE_MODE is not None:
         return _HIVE_MODE
 
-    # Prefer subprocess CLI — it reliably uses local mode and avoids YARN classpath issues
-    if _probe_hive_cli():
-        _HIVE_MODE = "subprocess"
-    elif _probe_hiveserver2():
+    # Quick port checks to fail fast and avoid slow timeouts
+    metastore_open = is_port_open("localhost", 9083, timeout=1.0)
+    hs2_open = is_port_open("localhost", 10000, timeout=1.0)
+
+    if not metastore_open:
+        logger.info("Hive Metastore port 9083 is closed. Forcing offline mode.")
+        _HIVE_MODE = "offline"
+        return _HIVE_MODE
+
+    # If HiveServer2 is open, prefer "live" mode (much faster than spawning a JVM for each query)
+    if hs2_open and _probe_hiveserver2():
         _HIVE_MODE = "live"
+    elif _probe_hive_cli():
+        _HIVE_MODE = "subprocess"
     else:
         _HIVE_MODE = "offline"
 

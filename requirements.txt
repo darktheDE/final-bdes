@@ -11,3 +11,4 @@ mysql-connector-python==8.3.0
 pyhive>=0.7.0
 thrift>=0.16.0
 thrift-sasl>=0.4.3
+setuptools

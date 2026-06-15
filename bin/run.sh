@@ -96,7 +96,7 @@ echo -e "\n[1/4] Starting database and big data services..."
 check_port() {
     local port=$1
     local name=$2
-    if ss -tln 2>/dev/null | grep -q ":${port} "; then
+    if ss -tln 2>/dev/null | grep -q -E ":${port}\b"; then
         return 0  # port active
     fi
     return 1  # port not active
@@ -220,6 +220,15 @@ if [ "${CRAWL}" = true ]; then
     echo "  -> Syncing MySQL → HDFS..."
     python src/ingest/mysql_to_hdfs.py \
         || echo "    [!] mysql_to_hdfs.py failed — check HDFS status."
+
+    # Update Hive schemas and views
+    echo "  -> Registering Hive schemas (hive_schema.sql)..."
+    hive -f src/ingest/hive_schema.sql \
+        || echo "    [!] hive_schema.sql failed to register."
+
+    echo "  -> Generating Hive analytical views (hive_analytics.sql)..."
+    hive -f src/ingest/hive_analytics.sql \
+        || echo "    [!] hive_analytics.sql failed to generate."
 else
     echo "  [*] Skipping data import (use --crawl to re-import and sync local data)."
 fi
