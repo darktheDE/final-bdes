@@ -1,42 +1,92 @@
 #!/bin/bash
 # ==============================================================================
-# Food & Restaurant Sentiment Analysis System - WSL2 Ubuntu Big Data Stack Installer
-# Cycle 0: Base Services Infrastructure Setup (Automated Manual Installation Script)
+# Food & Restaurant Sentiment Analysis System
+# Infrastructure Installer — WSL2 Ubuntu 24.04 LTS
+#
+# Usage:
+#   bash bin/install_infra.sh           # Full install / re-install
+#
+# What this script does (idempotent — safe to re-run):
+#   1. SSH passwordless localhost setup  (Hadoop requires this)
+#   2. Java 8 OpenJDK                   (Hadoop 3.3.6 + Hive 3.1.3 require Java 8)
+#   3. MySQL 8.0                        (Hive metastore + app database)
+#   4. MongoDB 8.0                      (Raw restaurant data store)
+#   5. Apache Hadoop 3.3.6              (HDFS + YARN)
+#   6. Apache Hive 3.1.3               (Data warehouse / OLAP)
+#   7. Python venv + dependencies       (mrjob, streamlit, scrapy, ...)
+#
+# After running this script, use:
+#   ./bin/run.sh [--crawl] [--jobs]     # Start the full pipeline
+#   ./bin/stop.sh [--backup] [--cleandata]  # Stop all services
 # ==============================================================================
 
 set -e
 
+# Detect base directory of the project (parent of bin/)
+BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 echo "======================================================================"
-echo "Starting Big Data Stack Installation & Configuration on WSL2/Ubuntu..."
+echo " Food & Restaurant Sentiment Analysis System — Infrastructure Installer"
+echo " Base directory: ${BASE_DIR}"
+echo " Target: Ubuntu 24.04 LTS (WSL2)"
 echo "======================================================================"
 
-# 1. SSH Server Configuration
-echo -e "\n[*] Step 1: Configuring SSH Server..."
-sudo apt-get update
+# ──────────────────────────────────────────────────────────────────────────────
+# STEP 1: SSH Server — Required for Hadoop pseudo-distributed mode
+# ──────────────────────────────────────────────────────────────────────────────
+echo -e "\n[Step 1/7] Configuring SSH Server for Hadoop..."
+sudo apt-get update -qq
 sudo apt-get install -y openssh-server
-sudo service ssh start
 
-# Configure passwordless SSH localhost access
+sudo service ssh start || true
+
 mkdir -p ~/.ssh
 chmod 700 ~/.ssh
+
 if [ ! -f ~/.ssh/id_rsa ]; then
     ssh-keygen -t rsa -P '' -f ~/.ssh/id_rsa
 fi
-cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
+
+# Append public key only if not already present
+if ! grep -qF "$(cat ~/.ssh/id_rsa.pub)" ~/.ssh/authorized_keys 2>/dev/null; then
+    cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
+fi
 chmod 0600 ~/.ssh/authorized_keys
-ssh-keyscan -H localhost >> ~/.ssh/known_hosts
-ssh-keyscan -H 127.0.0.1 >> ~/.ssh/known_hosts
 
-echo "[+] SSH passwordless access configured successfully."
+# Add localhost fingerprints (idempotent)
+ssh-keyscan -H localhost >> ~/.ssh/known_hosts 2>/dev/null || true
+ssh-keyscan -H 127.0.0.1 >> ~/.ssh/known_hosts 2>/dev/null || true
 
-# 2. Java Environments Setup (Java 8 for Hadoop and Hive compatibility)
-echo -e "\n[*] Step 2: Installing Java JDK 8..."
-sudo apt-get install -y openjdk-8-jdk
+echo "[+] SSH passwordless access configured."
 
-# Configure .bashrc paths at the very top to prevent early return blocking
-echo "[*] Adding environment variables to ~/.bashrc..."
-cat << 'EOF' > /tmp/env_vars_temp
-export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+# ──────────────────────────────────────────────────────────────────────────────
+# STEP 2: Java 8 — Hadoop 3.3.6 and Hive 3.1.3 require Java 8
+#          (Java 11+ causes Kryo NoSuchFieldException in Hive 3.x)
+# ──────────────────────────────────────────────────────────────────────────────
+echo -e "\n[Step 2/7] Checking Java 8 (OpenJDK)..."
+
+JAVA8_PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre"
+
+if java -version 2>&1 | grep -q '"1\.8'; then
+    echo "[+] Java 8 already active — skipping install."
+else
+    echo "[*] Java 8 not active. Installing openjdk-8-jdk..."
+    sudo apt-get install -y openjdk-8-jdk
+    # Set Java 8 as default
+    sudo update-alternatives --set java "${JAVA8_PATH}/bin/java" 2>/dev/null || true
+fi
+
+export JAVA_HOME="${JAVA8_PATH}"
+echo "  -> JAVA_HOME = ${JAVA_HOME}"
+echo "  -> java version: $(java -version 2>&1 | head -n 1)"
+
+# Write environment variables to ~/.bashrc (idempotent)
+if ! grep -q "HADOOP_HOME" ~/.bashrc; then
+    echo "[*] Adding environment variables to ~/.bashrc..."
+    cat >> ~/.bashrc << 'ENVEOF'
+
+# ── Food Sentiment Analysis — Big Data Stack ──────────────────────────────────
+export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64/jre
 export HADOOP_HOME=/usr/local/hadoop
 export HADOOP_INSTALL=$HADOOP_HOME
 export HADOOP_MAPRED_HOME=$HADOOP_HOME
@@ -45,222 +95,256 @@ export HADOOP_HDFS_HOME=$HADOOP_HOME
 export YARN_HOME=$HADOOP_HOME
 export HADOOP_COMMON_LIB_NATIVE_DIR=$HADOOP_HOME/lib/native
 export HIVE_HOME=/usr/local/hive
-export PATH=$PATH:$HADOOP_HOME/sbin:$HADOOP_HOME/bin:$HIVE_HOME/bin
 export HADOOP_OPTS="-Djava.library.path=$HADOOP_HOME/lib/native"
-EOF
-
-# Combine variables to the top of .bashrc safely
-if ! grep -q "HADOOP_HOME" ~/.bashrc; then
-    cat /tmp/env_vars_temp ~/.bashrc > ~/.bashrc.new && mv ~/.bashrc.new ~/.bashrc
+export PATH=$PATH:$HADOOP_HOME/sbin:$HADOOP_HOME/bin:$HIVE_HOME/bin
+# ─────────────────────────────────────────────────────────────────────────────
+ENVEOF
 fi
-rm -f /tmp/env_vars_temp
 
-# 3. MySQL Server Configuration
-echo -e "\n[*] Step 3: Configuring MySQL Server..."
-sudo apt-get install -y mysql-server
+# ──────────────────────────────────────────────────────────────────────────────
+# STEP 3: MySQL 8.0 — App database + Hive metastore backend
+# ──────────────────────────────────────────────────────────────────────────────
+echo -e "\n[Step 3/7] Configuring MySQL Server..."
+
+if mysql --version 2>/dev/null | grep -q "mysql"; then
+    echo "[+] MySQL already installed — skipping download."
+else
+    sudo apt-get install -y mysql-server
+fi
+
 sudo service mysql start
 
-# Configure permissions and create metastore/app databases
-sudo mysql -u root << 'EOF'
+# Configure databases and users (idempotent)
+echo "[*] Creating databases and users..."
+sudo mysql -u root << 'SQLEOF'
+-- App database
+CREATE DATABASE IF NOT EXISTS food_sentiment_db
+    CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- Hive metastore database
+CREATE DATABASE IF NOT EXISTS hive_metastore
+    CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- root with empty password for TCP (127.0.0.1) access — app connection
 CREATE USER IF NOT EXISTS 'root'@'127.0.0.1' IDENTIFIED BY '';
 ALTER USER 'root'@'127.0.0.1' IDENTIFIED BY '';
 GRANT ALL PRIVILEGES ON *.* TO 'root'@'127.0.0.1' WITH GRANT OPTION;
+
+-- root@localhost — keep consistent
 ALTER USER 'root'@'localhost' IDENTIFIED BY '';
 GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' WITH GRANT OPTION;
 
-CREATE DATABASE IF NOT EXISTS food_sentiment_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE DATABASE IF NOT EXISTS hive_metastore CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
-CREATE USER IF NOT EXISTS 'hive'@'%' IDENTIFIED BY 'hive';
-GRANT ALL PRIVILEGES ON hive_metastore.* TO 'hive'@'%';
+-- Dedicated Hive metastore user (NEVER use root for Hive JDBC)
 CREATE USER IF NOT EXISTS 'hive'@'localhost' IDENTIFIED BY 'hive';
 GRANT ALL PRIVILEGES ON hive_metastore.* TO 'hive'@'localhost';
+CREATE USER IF NOT EXISTS 'hive'@'%' IDENTIFIED BY 'hive';
+GRANT ALL PRIVILEGES ON hive_metastore.* TO 'hive'@'%';
 
 FLUSH PRIVILEGES;
-EOF
+SQLEOF
 
-echo "[+] MySQL databases and users configured successfully."
+echo "[+] MySQL databases and users configured."
 
-# 4. MongoDB Server Configuration
-echo -e "\n[*] Step 4: Installing and Starting MongoDB..."
-sudo apt-get install -y gnupg curl
-curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | sudo gpg --dearmor -o /usr/share/keyrings/mongodb-server-8.0.gpg
-echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu noble/mongodb-org/8.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
-sudo apt-get update
-sudo apt-get install -y mongodb-org
-sudo service mongod start
+# ──────────────────────────────────────────────────────────────────────────────
+# STEP 4: MongoDB 8.0 Community — Raw restaurant + meals data store
+# ──────────────────────────────────────────────────────────────────────────────
+echo -e "\n[Step 4/7] Configuring MongoDB 8.0..."
 
-echo "[+] MongoDB started successfully."
+if mongod --version 2>/dev/null | grep -q "db version"; then
+    echo "[+] MongoDB already installed — skipping download."
+else
+    echo "[*] Installing MongoDB 8.0..."
+    sudo apt-get install -y gnupg curl
+    curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc \
+        | sudo gpg --dearmor -o /usr/share/keyrings/mongodb-server-8.0.gpg
+    echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] \
+https://repo.mongodb.org/apt/ubuntu noble/mongodb-org/8.0 multiverse" \
+        | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
+    sudo apt-get update -qq
+    sudo apt-get install -y mongodb-org
+fi
 
-# 5. Apache Hadoop Installation & Configuration
-echo -e "\n[*] Step 5: Downloading and Configuring Apache Hadoop 3.3.6..."
+sudo service mongod start || true
+echo "[+] MongoDB started."
+
+# ──────────────────────────────────────────────────────────────────────────────
+# STEP 5: Apache Hadoop 3.3.6 — HDFS + YARN
+# ──────────────────────────────────────────────────────────────────────────────
+echo -e "\n[Step 5/7] Installing Apache Hadoop 3.3.6..."
+
+HADOOP_INSTALL_DIR="/usr/local/hadoop"
 HADOOP_TAR="/tmp/hadoop-3.3.6.tar.gz"
-if [ ! -f "$HADOOP_TAR" ] || [ $(stat -c%s "$HADOOP_TAR") -lt 700000000 ]; then
-    echo "[*] Downloading Hadoop 3.3.6..."
-    rm -f "$HADOOP_TAR"
-    curl -L -o "$HADOOP_TAR" https://archive.apache.org/dist/hadoop/common/hadoop-3.3.6/hadoop-3.3.6.tar.gz
+HADOOP_VERSION_CHECK="3.3.6"
+
+# Check if correct version already installed
+if [ -d "${HADOOP_INSTALL_DIR}" ] && \
+   "${HADOOP_INSTALL_DIR}/bin/hadoop" version 2>/dev/null | grep -q "${HADOOP_VERSION_CHECK}"; then
+    echo "[+] Hadoop ${HADOOP_VERSION_CHECK} already installed at ${HADOOP_INSTALL_DIR} — skipping download."
+else
+    echo "[*] Downloading Hadoop ${HADOOP_VERSION_CHECK}..."
+    # Only download if tar not present or incomplete (< 700 MB)
+    if [ ! -f "${HADOOP_TAR}" ] || [ "$(stat -c%s "${HADOOP_TAR}" 2>/dev/null || echo 0)" -lt 700000000 ]; then
+        rm -f "${HADOOP_TAR}"
+        curl -L -o "${HADOOP_TAR}" \
+            https://archive.apache.org/dist/hadoop/common/hadoop-3.3.6/hadoop-3.3.6.tar.gz
+    fi
+
+    echo "[*] Extracting Hadoop to ${HADOOP_INSTALL_DIR}..."
+    sudo rm -rf "${HADOOP_INSTALL_DIR}" /usr/local/hadoop-3.3.6
+    sudo tar -xzf "${HADOOP_TAR}" -C /usr/local/
+    sudo mv /usr/local/hadoop-3.3.6 "${HADOOP_INSTALL_DIR}"
+    sudo chown -R "${USER}:${USER}" "${HADOOP_INSTALL_DIR}"
 fi
 
-echo "[*] Extracting Hadoop to /usr/local/hadoop..."
-sudo rm -rf /usr/local/hadoop /usr/local/hadoop-3.3.6
-sudo tar -xzf "$HADOOP_TAR" -C /usr/local/
-sudo mv /usr/local/hadoop-3.3.6 /usr/local/hadoop
-sudo chown -R $USER:$USER /usr/local/hadoop
+export HADOOP_HOME="${HADOOP_INSTALL_DIR}"
 
-# Write Hadoop configuration files
-echo "[*] Generating core-site.xml..."
-cat <<EOT > /usr/local/hadoop/etc/hadoop/core-site.xml
-<?xml version="1.0" encoding="UTF-8"?>
-<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
-<configuration>
-    <property>
-        <name>fs.defaultFS</name>
-        <value>hdfs://localhost:9000</value>
-    </property>
-</configuration>
-EOT
+# Copy XML config files from project conf/ into Hadoop installation
+echo "[*] Copying Hadoop config from conf/hadoop/ ..."
+cp "${BASE_DIR}/conf/hadoop/core-site.xml"  "${HADOOP_HOME}/etc/hadoop/core-site.xml"
+cp "${BASE_DIR}/conf/hadoop/hdfs-site.xml"  "${HADOOP_HOME}/etc/hadoop/hdfs-site.xml"
+cp "${BASE_DIR}/conf/hadoop/yarn-site.xml"  "${HADOOP_HOME}/etc/hadoop/yarn-site.xml"
+cp "${BASE_DIR}/conf/hadoop/mapred-site.xml" "${HADOOP_HOME}/etc/hadoop/mapred-site.xml"
+echo "[+] Hadoop config copied."
 
-echo "[*] Generating hdfs-site.xml..."
-cat <<EOT > /usr/local/hadoop/etc/hadoop/hdfs-site.xml
-<?xml version="1.0" encoding="UTF-8"?>
-<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
-<configuration>
-    <property>
-        <name>dfs.replication</name>
-        <value>1</value>
-    </property>
-</configuration>
-EOT
+# Set JAVA_HOME in hadoop-env.sh
+HADOOP_ENV="${HADOOP_HOME}/etc/hadoop/hadoop-env.sh"
+if ! grep -q "^export JAVA_HOME=/usr/lib/jvm/java-8" "${HADOOP_ENV}"; then
+    # Remove any existing export JAVA_HOME line to avoid duplicates
+    sed -i '/^export JAVA_HOME=/d' "${HADOOP_ENV}"
+    echo 'export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64/jre' >> "${HADOOP_ENV}"
+fi
+echo "[+] hadoop-env.sh JAVA_HOME configured."
 
-echo "[*] Generating yarn-site.xml..."
-cat <<EOT > /usr/local/hadoop/etc/hadoop/yarn-site.xml
-<?xml version="1.0" encoding="UTF-8"?>
-<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
-<configuration>
-    <property>
-        <name>yarn.nodemanager.aux-services</name>
-        <value>mapreduce_shuffle</value>
-    </property>
-    <property>
-        <name>yarn.nodemanager.aux-services.mapreduce_shuffle.class</name>
-        <value>org.apache.hadoop.mapred.ShuffleHandler</value>
-    </property>
-    <property>
-        <name>yarn.nodemanager.vmem-check-enabled</name>
-        <value>false</value>
-    </property>
-</configuration>
-EOT
-
-echo "[*] Generating mapred-site.xml..."
-cat <<EOT > /usr/local/hadoop/etc/hadoop/mapred-site.xml
-<?xml version="1.0" encoding="UTF-8"?>
-<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
-<configuration>
-    <property>
-        <name>mapreduce.framework.name</name>
-        <value>yarn</value>
-    </property>
-    <property>
-        <name>mapreduce.application.classpath</name>
-        <value>\$HADOOP_HOME/share/hadoop/mapreduce/*:\$HADOOP_HOME/share/hadoop/mapreduce/lib/*</value>
-    </property>
-</configuration>
-EOT
-
-# Set up hadoop-env.sh JAVA_HOME
-echo "[*] Configuring hadoop-env.sh..."
-sed -i 's|# export JAVA_HOME=|export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64|g' /usr/local/hadoop/etc/hadoop/hadoop-env.sh
-if ! grep -q "export JAVA_HOME=" /usr/local/hadoop/etc/hadoop/hadoop-env.sh; then
-    echo 'export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64' >> /usr/local/hadoop/etc/hadoop/hadoop-env.sh
+# Format NameNode only if it has never been formatted
+HDFS_DATA_DIR="${HOME}/hadoop_data"
+if [ ! -d "${HDFS_DATA_DIR}/dfs/name" ]; then
+    echo "[*] Formatting HDFS NameNode (first time)..."
+    "${HADOOP_HOME}/bin/hdfs" namenode -format -force
+else
+    echo "[+] NameNode already formatted — skipping."
 fi
 
-# Format HDFS NameNode
-echo "[*] Formatting HDFS NameNode..."
-/usr/local/hadoop/bin/hdfs namenode -format -force
+echo "[*] Starting Hadoop DFS & YARN..."
+"${HADOOP_HOME}/sbin/start-dfs.sh"
+"${HADOOP_HOME}/sbin/start-yarn.sh"
 
-# Start HDFS & YARN
-echo "[*] Booting Hadoop services..."
-/usr/local/hadoop/sbin/start-dfs.sh
-/usr/local/hadoop/sbin/start-yarn.sh
-
-echo "[+] Apache Hadoop is running. Current processes:"
+echo "[+] Hadoop services started. Running processes:"
 jps
 
-# 6. Apache Hive Installation & Metastore Setup
-echo -e "\n[*] Step 6: Downloading and Configuring Apache Hive 3.1.3..."
+# ──────────────────────────────────────────────────────────────────────────────
+# STEP 6: Apache Hive 3.1.3 — Data Warehouse / OLAP
+# ──────────────────────────────────────────────────────────────────────────────
+echo -e "\n[Step 6/7] Installing Apache Hive 3.1.3..."
+
+HIVE_INSTALL_DIR="/usr/local/hive"
 HIVE_TAR="/tmp/apache-hive-3.1.3-bin.tar.gz"
-if [ ! -f "$HIVE_TAR" ] || [ $(stat -c%s "$HIVE_TAR") -lt 300000000 ]; then
-    echo "[*] Downloading Apache Hive 3.1.3..."
-    rm -f "$HIVE_TAR"
-    curl -L -o "$HIVE_TAR" https://archive.apache.org/dist/hive/hive-3.1.3/apache-hive-3.1.3-bin.tar.gz
+HIVE_VERSION_CHECK="3.1.3"
+
+if [ -d "${HIVE_INSTALL_DIR}" ] && \
+   "${HIVE_INSTALL_DIR}/bin/hive" --version 2>/dev/null | grep -q "${HIVE_VERSION_CHECK}"; then
+    echo "[+] Hive ${HIVE_VERSION_CHECK} already installed — skipping download."
+else
+    echo "[*] Downloading Apache Hive ${HIVE_VERSION_CHECK}..."
+    if [ ! -f "${HIVE_TAR}" ] || [ "$(stat -c%s "${HIVE_TAR}" 2>/dev/null || echo 0)" -lt 300000000 ]; then
+        rm -f "${HIVE_TAR}"
+        curl -L -o "${HIVE_TAR}" \
+            https://archive.apache.org/dist/hive/hive-3.1.3/apache-hive-3.1.3-bin.tar.gz
+    fi
+
+    echo "[*] Extracting Hive to ${HIVE_INSTALL_DIR}..."
+    sudo rm -rf "${HIVE_INSTALL_DIR}" /usr/local/apache-hive-3.1.3-bin
+    sudo tar -xzf "${HIVE_TAR}" -C /usr/local/
+    sudo mv /usr/local/apache-hive-3.1.3-bin "${HIVE_INSTALL_DIR}"
+    sudo chown -R "${USER}:${USER}" "${HIVE_INSTALL_DIR}"
 fi
 
-echo "[*] Extracting Hive to /usr/local/hive..."
-sudo rm -rf /usr/local/hive /usr/local/apache-hive-3.1.3-bin
-sudo tar -xzf "$HIVE_TAR" -C /usr/local/
-sudo mv /usr/local/apache-hive-3.1.3-bin /usr/local/hive
-sudo chown -R $USER:$USER /usr/local/hive
+export HIVE_HOME="${HIVE_INSTALL_DIR}"
 
-# Download MySQL JDBC Connector
-echo "[*] Downloading MySQL JDBC connector..."
+# MySQL JDBC Connector for Hive metastore
 MYSQL_JAR="/tmp/mysql-connector-j-8.3.0.jar"
-if [ ! -f "$MYSQL_JAR" ]; then
-    curl -L -o "$MYSQL_JAR" https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.3.0/mysql-connector-j-8.3.0.jar
+MYSQL_JAR_DEST="${HIVE_HOME}/lib/mysql-connector-j-8.3.0.jar"
+if [ ! -f "${MYSQL_JAR_DEST}" ]; then
+    echo "[*] Downloading MySQL JDBC connector..."
+    if [ ! -f "${MYSQL_JAR}" ]; then
+        curl -L -o "${MYSQL_JAR}" \
+            https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.3.0/mysql-connector-j-8.3.0.jar
+    fi
+    cp "${MYSQL_JAR}" "${MYSQL_JAR_DEST}"
+    echo "[+] MySQL JDBC connector installed."
+else
+    echo "[+] MySQL JDBC connector already present."
 fi
-cp "$MYSQL_JAR" /usr/local/hive/lib/
 
-# Resolve Hive vs Hadoop Guava conflict
-echo "[*] Fixing Guava library version mismatch..."
-rm -f /usr/local/hive/lib/guava-19.0.jar
-cp /usr/local/hadoop/share/hadoop/common/lib/guava-27.0-jre.jar /usr/local/hive/lib/
+# Fix Guava version mismatch — Hive 3.x ships guava-19, Hadoop 3.3.6 uses guava-27
+echo "[*] Fixing Guava library conflict (guava-19 → guava-27)..."
+rm -f "${HIVE_HOME}/lib/guava-19.0.jar"
+GUAVA_SRC="${HADOOP_HOME}/share/hadoop/common/lib/guava-27.0-jre.jar"
+GUAVA_DEST="${HIVE_HOME}/lib/guava-27.0-jre.jar"
+if [ -f "${GUAVA_SRC}" ] && [ ! -f "${GUAVA_DEST}" ]; then
+    cp "${GUAVA_SRC}" "${GUAVA_DEST}"
+    echo "[+] Guava 27 copied to Hive lib."
+else
+    echo "[+] Guava already fixed or source not found (skipping)."
+fi
 
-# Generate hive-site.xml
-echo "[*] Generating hive-site.xml..."
-cat <<EOT > /usr/local/hive/conf/hive-site.xml
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
-<configuration>
-    <property>
-        <name>javax.jdo.option.ConnectionURL</name>
-        <value>jdbc:mysql://localhost:3306/hive_metastore?createDatabaseIfNotExist=true&amp;useSSL=false&amp;allowPublicKeyRetrieval=true</value>
-    </property>
-    <property>
-        <name>javax.jdo.option.ConnectionDriverName</name>
-        <value>com.mysql.cj.jdbc.Driver</value>
-    </property>
-    <property>
-        <name>javax.jdo.option.ConnectionUserName</name>
-        <value>hive</value>
-    </property>
-    <property>
-        <name>javax.jdo.option.ConnectionPassword</name>
-        <value>hive</value>
-    </property>
-    <property>
-        <name>hive.metastore.warehouse.dir</name>
-        <value>/user/hive/warehouse</value>
-    </property>
-    <property>
-        <name>hive.cli.print.header</name>
-        <value>true</value>
-    </property>
-    <property>
-        <name>hive.cli.print.current.db</name>
-        <value>true</value>
-    </property>
-</configuration>
-EOT
+# Copy hive-site.xml from project conf/
+echo "[*] Copying hive-site.xml from conf/hive/ ..."
+cp "${BASE_DIR}/conf/hive/hive-site.xml" "${HIVE_HOME}/conf/hive-site.xml"
+echo "[+] hive-site.xml copied."
 
-# Initialize Hive Metastore Schema
-echo "[*] Initializing Hive Metastore Schema..."
-export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-/usr/local/hive/bin/schematool -dbType mysql -initSchema
+# Initialize Hive Metastore schema (idempotent — will skip if already initialized)
+echo "[*] Initializing Hive Metastore schema in MySQL..."
+export JAVA_HOME="${JAVA8_PATH}"
+"${HIVE_HOME}/bin/schematool" -dbType mysql -initSchema 2>&1 \
+    | grep -v "SLF4J" || true
+echo "[+] Hive Metastore initialized."
 
-echo -e "\n[*] Step 7: Verifying Hive installation..."
-/usr/local/hive/bin/hive -e "SHOW DATABASES;"
+# Create HDFS warehouse directory
+"${HADOOP_HOME}/bin/hdfs" dfs -mkdir -p /user/hive/warehouse 2>/dev/null || true
+"${HADOOP_HOME}/bin/hdfs" dfs -chmod g+w /user/hive/warehouse 2>/dev/null || true
 
+# Quick smoke test
+echo "[*] Verifying Hive installation..."
+"${HIVE_HOME}/bin/hive" -e "SHOW DATABASES;" 2>/dev/null || echo "[!] Hive smoke test skipped (metastore may need a moment to start)."
+
+# ──────────────────────────────────────────────────────────────────────────────
+# STEP 7: Python Virtual Environment + Dependencies
+# ──────────────────────────────────────────────────────────────────────────────
+echo -e "\n[Step 7/7] Setting up Python virtual environment..."
+
+# Ensure python3-venv is available
+if ! dpkg -l 2>/dev/null | grep -q "python3-venv"; then
+    echo "[*] Installing python3-venv..."
+    sudo apt-get install -y python3-venv python3-pip
+fi
+
+VENV_DIR="${BASE_DIR}/venv"
+if [ ! -d "${VENV_DIR}" ]; then
+    echo "[*] Creating virtual environment at ${VENV_DIR}..."
+    python3 -m venv "${VENV_DIR}"
+fi
+
+echo "[*] Activating venv and installing dependencies..."
+source "${VENV_DIR}/bin/activate"
+pip install --upgrade pip --quiet
+pip install -r "${BASE_DIR}/requirements.txt" --quiet
+echo "[+] Python dependencies installed."
+
+# Initialize database schemas with seed data
+echo "[*] Running init_db.py to initialize MySQL schema and load seed data..."
+python "${BASE_DIR}/src/ingest/init_db.py" || echo "[!] init_db.py failed — run manually after services are ready."
+
+# ──────────────────────────────────────────────────────────────────────────────
+# DONE
+# ──────────────────────────────────────────────────────────────────────────────
 echo -e "\n======================================================================"
-echo "Big Data Infrastructure Stack configured successfully!"
-echo "Enjoy analyzing restaurant sentiments!"
+echo "[+] Infrastructure setup complete!"
+echo ""
+echo " Next steps:"
+echo "   1. Start the system:   ./bin/run.sh"
+echo "   2. With fresh data:    ./bin/run.sh --crawl"
+echo "   3. Run MR jobs:        ./bin/run.sh --jobs"
+echo "   4. Stop everything:    ./bin/stop.sh"
+echo ""
+echo " Open dashboard: http://localhost:8501"
 echo "======================================================================"

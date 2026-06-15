@@ -171,3 +171,138 @@ mysql -h 127.0.0.1 -u root food_sentiment_db -e "SELECT name, district_parsed, c
 - **`init_db.py` (Hotfixes)**:
   - Đồng bộ cơ chế dự phòng mật khẩu kết nối cơ sở dữ liệu (`""` -> `"root"`) giống như `app.py`.
   - Nâng cấp regex trong hàm `_extract_district` nhằm trích xuất chính xác tên Quận ở nhiều định dạng đa dạng (tiền tố tiếng Việt, hậu tố tiếng Anh, v.v.).
+
+---
+
+## Module 5: Bin Scripts Refactor
+
+**Ngày thực hiện**: 2026-06-14
+**Mục tiêu**: Hợp lý hóa 3 scripts bin/, tách XML config ra folder riêng, thêm stop.sh, bổ sung flags cho run.sh.
+
+### Vấn đề phát hiện
+
+| Vấn đề | File bị ảnh hưởng | Mô tả |
+|--------|------------------|-------|
+| XML config inline trong .sh | install_infra.sh | Khó maintain, không tái sử dụng được |
+| setup.sh cài JDK 11 | setup.sh | Sai version, overlap với install_infra.sh |
+| run.sh luôn crawl | run.sh | Tốn 10-15 phút mỗi lần start, không có flag |
+| Refer đến setup.sh | run.sh (dòng 73) | Hướng dẫn sai khi venv không tồn tại |
+| Không có stop.sh | — | Người dùng phải kill process thủ công |
+| db_backup.sh dùng set -e | db_backup.sh | Script crash nếu MySQL hoặc Mongo down |
+
+### Các thay đổi thực hiện
+
+#### `conf/hadoop/` (files mới)
+- **Tạo** `core-site.xml` — HDFS defaultFS `hdfs://localhost:9000`
+- **Tạo** `hdfs-site.xml` — `dfs.replication=1`
+- **Tạo** `yarn-site.xml` — mapreduce_shuffle, disable vmem-check (bắt buộc cho WSL2)
+- **Tạo** `mapred-site.xml` — framework=yarn, classpath
+
+#### `conf/hive/hive-site.xml` (file mới)
+- **Tạo** `hive-site.xml` — MySQL metastore (user=hive/hive), warehouse dir, thêm `hive.stats.autogather=false` để tránh lỗi Kryo
+
+#### `bin/install_infra.sh` (refactor hoàn toàn)
+- **Thêm** version-check trước khi cài: Java 8, Hadoop 3.3.6, Hive 3.1.3, MongoDB, MySQL
+- **Thay** inline XML heredoc → `cp "${BASE_DIR}/conf/hadoop/*.xml"` và `cp "${BASE_DIR}/conf/hive/hive-site.xml"`
+- **Gộp** Python venv setup từ setup.sh: cài python3-venv, tạo venv, cài requirements.txt
+- **Thêm** `init_db.py` call ở cuối để khởi tạo schema và seed data
+- **Thêm** idempotent guards: SSH key chỉ thêm nếu chưa có, NameNode format chỉ chạy lần đầu
+- **Fix** `.bashrc` append: dùng `>>` thay vì overwrite, có guard để không duplicate
+
+#### `bin/run.sh` (refactor)
+- **Thêm** flag `--crawl`: chỉ chạy scraper + `init_db.py` + HDFS sync khi có flag này
+- **Thêm** flag `--jobs`: chỉ chạy `run_all_jobs.py` khi có flag này
+- **Thêm** flag `--help`: in hướng dẫn sử dụng
+- **Thêm** version-check Java 8 và Hadoop 3.3.6 — exit nếu sai, yêu cầu chạy install_infra.sh
+- **Fix** refer đến setup.sh → thay bằng install_infra.sh
+- **Thêm** port summary rõ ràng sau khi start services
+- **Cải thiện** service start: dùng check_port() để skip nếu đã running
+
+#### `bin/stop.sh` (tạo mới)
+- **Tạo** script dừng toàn bộ theo thứ tự: Streamlit → YARN → HDFS → MongoDB → MySQL
+- **Thêm** flag `--backup`: chạy db_backup.sh trước khi stop
+- **Thêm** flag `--cleandata`: xóa MySQL food_sentiment_db, MongoDB sentiment_db, HDFS /data/raw
+- **Không dùng** `set -e` — từng bước tự xử lý lỗi, không crash khi service đã down
+
+#### `src/backup/db_backup.sh` (fix)
+- **Xóa** `set -e`
+- **Thêm** kiểm tra return code của `mysqldump` và `mongodump` riêng biệt
+- **Thêm** biến `BACKUP_SUCCESS=true` — báo cáo partial failure thay vì crash hoàn toàn
+- **Thêm** hiển thị kích thước file backup sau khi hoàn thành
+
+---
+
+## Module 6: Docs & File Cleanup
+
+**Ngày thực hiện**: 2026-06-14
+**Mục tiêu**: Di chuyển file stray, cập nhật README, dọn dẹp cấu trúc.
+
+### Các thay đổi thực hiện
+
+#### File stray di chuyển từ root
+| File cũ | File mới | Ghi chú |
+|---------|----------|---------|
+| `rules.md` (root) | `docs/rules.md` | Quy tắc làm việc nhóm |
+| `test_hive.py` (root) | `src/mapreduce/test_hive_connection.py` | Đổi tên rõ ràng hơn, thêm docstring |
+| `test_district.py` (root) | `src/mapreduce/test_district_parsing.py` | Fix sys.path để chạy từ bất kỳ thư mục nào |
+
+#### Files cần xóa thủ công (user tự xóa)
+- `rules.md` (root)
+- `test_hive.py` (root)
+- `test_district.py` (root)
+- `refactor.md` (root)
+- `final-refactor.md` (root)
+- `bin/setup.sh`
+- `tmp-pandas/` (thư mục)
+
+#### `README.md` (rewrite hoàn toàn)
+- **Cập nhật** quick start: bỏ setup.sh, flow mới `install_infra.sh` → `run.sh [--crawl] [--jobs]` → `stop.sh [--backup] [--cleandata]`
+- **Thêm** bảng Tech Stack & Version
+- **Cập nhật** cấu trúc thư mục đúng với thực tế hiện tại (có `conf/hadoop/`, `conf/hive/`, bỏ `setup.sh`)
+- **Thêm** bảng 8 MapReduce jobs
+- **Thêm** bảng 7 Hive analytics views
+- **Ghi rõ** mối liên hệ TripAdvisor ↔ TheMealDB (qua `mr_ingredient_match.py`)
+- **Thêm** bảng Troubleshooting nhanh
+
+#### `.gitignore`
+- Đã đầy đủ (`venv/`, `tmp-pandas/`, `data/backups/`, etc.) — không cần thay đổi
+
+---
+
+## Module 7: Fixing Subprocess Hive Queries & Rating Distribution View
+
+**Ngày thực hiện**: 2026-06-15
+**Mục tiêu**: Điều tra và sửa lỗi hiển thị biểu đồ trên Streamlit (Chart 4, Chart 5, Chart 3) do YARN classpath thiếu Class `JsonSerDe` và lỗi aggregation của `FLOOR` trong local mode.
+
+### Vấn đề phát hiện
+
+1. **Lỗi `ClassNotFoundException` trên YARN (Chart 4 & Chart 5)**: 
+   - Khi chạy Streamlit ở chế độ `subprocess` (chạy `hive -S -e`), các truy vấn Hive OLAP được gom thành batch gửi qua CLI. Do YARN chạy các task MapReduce trên container độc lập, nó không tìm thấy class `org.apache.hive.hcatalog.data.JsonSerDe` dẫn đến lỗi `return code 2` từ Hive.
+   - Hàm `_query_via_pyhive` đã có cấu hình `set hive.exec.mode.local.auto=true` để chạy trong local mode (bỏ qua YARN) tránh thiếu RAM/conflict classpath, nhưng các hàm chạy subprocess CLI (`_query_via_subprocess` và `batch_query_all_views` trong `hive_connector.py`, và `run_hive_query` trong `app.py`) lại chưa được cấu hình.
+2. **Biểu đồ số sao (Chart 3) hiển thị sai dữ liệu (chỉ có 0 sao)**:
+   - Trong view `view_review_distribution`, trường `stars` được định nghĩa bằng biểu thức `CAST(FLOOR(rating) AS INT)`. Tuy nhiên, khi gom nhóm và chạy dưới Hive trong local mode, biểu thức này bị lỗi type coercion khiến tất cả các rating từ 1-5 sao đều bị trả về `0`, dẫn đến toàn bộ dữ liệu (44,863 đánh giá) bị gộp vào nhóm 0 sao.
+3. **Các view OLAP chưa được load**:
+   - Các view phân tích OLAP mới trong `src/ingest/hive_analytics.sql` chưa được chạy tự động trong setup script dẫn đến việc metadata của metastore vẫn giữ các view cũ (`view_price_segment` và `view_sentiment_by_price`), gây lỗi khi Streamlit cố truy vấn các cột không tồn tại.
+
+### Thay đổi thực hiện
+
+#### `src/streamlit_app/hive_connector.py`
+- **Cập nhật** hàm `_query_via_subprocess` prepending `set hive.exec.mode.local.auto=true;` vào câu lệnh SQL để ép Hive thực thi local.
+- **Cập nhật** hàm `batch_query_all_views` prepending `set hive.exec.mode.local.auto=true;` vào batch script.
+
+#### `src/streamlit_app/app.py`
+- **Cập nhật** hàm `run_hive_query` (dự phòng) prepending `set hive.exec.mode.local.auto=true;` vào sql.
+
+#### `src/ingest/hive_analytics.sql`
+- **Cập nhật** định nghĩa của `view_review_distribution` thay vì dùng `CAST(FLOOR(rating) AS INT)` chuyển sang dùng `CAST(rating AS INT)`. Vì rating của reviews chỉ chứa các giá trị số nguyên lưu dưới dạng float (1.0, 2.0, 3.0, 4.0, 5.0), việc cast trực tiếp sang `INT` đảm bảo độ chính xác hoàn toàn và khắc phục triệt để lỗi gom nhóm về 0 của Hive.
+
+### Hướng dẫn kiểm tra và kích hoạt thủ công
+Chạy các lệnh sau trong WSL2 để tạo lại schema và view mới trong Hive:
+```bash
+# 1. Chạy lại schema để khởi tạo DB và các external tables
+hive -f src/ingest/hive_schema.sql
+
+# 2. Chạy lại file view phân tích OLAP
+hive -f src/ingest/hive_analytics.sql
+```
+

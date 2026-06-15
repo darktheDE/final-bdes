@@ -9,23 +9,26 @@ This guide compiles common errors encountered when running Hadoop, HDFS, YARN, M
 
 ### Issue 1.1: `ssh: connect to host localhost port 22: Connection refused`
 - **Symptoms**: Starting HDFS (`start-dfs.sh`) fails with SSH connection refused error.
-- **Cause**: SSH server is either not installed or ssh daemon is inactive on WSL2.
+- **Cause**: SSH server is either not installed or inactive on WSL2.
 - **Solution**:
   1. Install openssh-server:
      ```bash
      sudo apt update && sudo apt install openssh-server -y
      ```
-  2. Start the ssh service:
+  2. Start the ssh service (needs to be done every time WSL restarts unless automated):
      ```bash
      sudo service ssh start
      ```
-  3. Generate and authorized keys to allow passwordless access:
+  3. Generate authorized keys to allow passwordless access:
      ```bash
      ssh-keygen -t rsa -P '' -f ~/.ssh/id_rsa
      cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
      chmod 0600 ~/.ssh/authorized_keys
      ```
-  4. Test with `ssh localhost`.
+  4. Test with:
+     ```bash
+     ssh localhost
+     ```
 
 ### Issue 1.2: MapReduce Job stuck at 0% or failing on YARN
 - **Symptoms**: YARN launches but MapReduce jobs freeze indefinitely.
@@ -37,6 +40,15 @@ This guide compiles common errors encountered when running Hadoop, HDFS, YARN, M
     <value>false</value>
   </property>
   ```
+
+### Issue 1.3: `Input path does not exist: hdfs://localhost:9000/.../restaurants.jsonl`
+- **Symptoms**: MapReduce job fails immediately claiming the file is missing.
+- **Cause**: HDFS path structure has been updated during refactor.
+- **Solution**: Verify the directory structure in HDFS using:
+  ```bash
+  hdfs dfs -ls -R /data/raw/
+  ```
+  Ensure you are using the correct full path: `hdfs://localhost:9000/data/raw/restaurants/restaurants.jsonl`
 
 ---
 
@@ -85,9 +97,19 @@ This guide compiles common errors encountered when running Hadoop, HDFS, YARN, M
      sudo service mysql restart
      ```
 
+### Issue 2.3: MySQL `district_parsed` values are all "Unknown"
+- **Symptoms**: After running `init_db.py`, the `district_parsed` column only contains "Unknown".
+- **Cause**: MySQL 8.0 deprecated `VALUES()` in `ON DUPLICATE KEY UPDATE`. The Python script's SQL UPSERT command might fail to update new columns if old rows existed.
+- **Solution**: Clear the tables and re-run ingestion:
+  ```sql
+  TRUNCATE TABLE reviews;
+  TRUNCATE TABLE restaurants;
+  ```
+  Then run `python src/ingest/init_db.py` again.
+
 ---
 
-## 3. Apache Hive Connection Issues
+## 3. Apache Hive Connection & Runtime Issues
 
 ### Issue 3.1: Hive client throws Connection Refused on Thrift Port 10000
 - **Symptoms**: Streamlit PyHive connector fails to communicate with Hive.
@@ -103,9 +125,27 @@ This guide compiles common errors encountered when running Hadoop, HDFS, YARN, M
      netstat -an | grep 10000
      ```
 
+### Issue 3.2: `NoSuchFieldException: parentOffset` (Java Kryo Conflict)
+- **Symptoms**: Running MapReduce queries via Hive fails with `Kryo` serialization errors.
+- **Cause**: Hive 3.1.3 is strictly incompatible with Java 11+. Using Java 11 causes reflection errors in Kryo.
+- **Solution**: Force Hadoop/Hive to use Java 8. Ensure `JAVA_HOME` points exactly to the Java 8 JRE:
+  ```bash
+  export JAVA_HOME="/usr/lib/jvm/java-8-openjdk-amd64/jre"
+  ```
+  Check that `${JAVA_HOME}/bin/java -version` returns `1.8.x`.
+
+### Issue 3.3: `java.lang.NoSuchMethodError: com.google.common.base.Preconditions.checkArgument`
+- **Symptoms**: Hive metastore or commands crash immediately on startup.
+- **Cause**: Library mismatch. Hive 3.1.3 ships with `guava-19.0.jar`, but Hadoop 3.3.6 requires `guava-27.0-jre.jar`.
+- **Solution**: Delete Hive's old Guava and copy Hadoop's newer version:
+  ```bash
+  rm /usr/local/hive/lib/guava-19.0.jar
+  cp /usr/local/hadoop/share/hadoop/common/lib/guava-27.0-jre.jar /usr/local/hive/lib/
+  ```
+
 ---
 
-## 4. Python Environment Issues
+## 4. Environment & Python Issues
 
 ### Issue 4.1: `ModuleNotFoundError: No module named 'distutils'`
 - **Symptoms**: PySpark or `mrjob` throws exceptions under Python 3.12 (Ubuntu 24.04 default).
@@ -118,4 +158,16 @@ This guide compiles common errors encountered when running Hadoop, HDFS, YARN, M
   python3.10 -m venv venv
   source venv/bin/activate
   pip install -r requirements.txt
+  ```
+
+### Issue 4.2: `/bin/sh: bash: not found` when running wsl from PowerShell
+- **Symptoms**: Running `wsl bash script.sh` from Windows gives a `not found` error.
+- **Cause**: Your WSL default distro might be set to `docker-desktop` (which uses Alpine/busybox) instead of `Ubuntu`.
+- **Solution**: Always specify the distro name:
+  ```powershell
+  wsl -d Ubuntu -- bash script.sh
+  ```
+  Or change your default distro in Windows PowerShell:
+  ```powershell
+  wsl -s Ubuntu
   ```

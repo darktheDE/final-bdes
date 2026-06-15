@@ -1,6 +1,28 @@
 # Kế Hoạch Kiểm Thử Toàn Hệ Thống (Master Manual Test Plan)
 
-Tài liệu này cung cấp các lệnh chạy trực tiếp trên terminal WSL (Ubuntu 24.04) để kiểm tra thủ công toàn bộ các module và dịch vụ của hệ thống Phân tích Cảm xúc Đồ ăn & Nhà hàng, đảm bảo tính toàn vẹn từ Cycle 0 đến Cycle 6. Bạn có thể tự mình copy/paste từng lệnh vào WSL để verify.
+Tài liệu này cung cấp các lệnh chạy trực tiếp trên terminal WSL (Ubuntu 24.04) để kiểm tra thủ công toàn bộ các module và dịch vụ của hệ thống Phân tích Cảm xúc Đồ ăn & Nhà hàng. Bạn có thể tự mình copy/paste từng lệnh vào WSL để verify.
+
+---
+
+## 0. Kiểm tra Bin Scripts & Unit Tests (Pre-flight)
+Mục tiêu: Đảm bảo các script điều khiển hệ thống và các hàm tiện ích cốt lõi hoạt động đúng.
+
+### 0.1. Kiểm tra Script Parameters
+* **Lệnh chạy**:
+  ```bash
+  bash bin/run.sh --help
+  bash bin/stop.sh --help
+  ```
+* **Kỳ vọng**: In ra màn hình trợ giúp hiển thị đúng thông tin các flags (`--crawl`, `--jobs`, `--backup`, `--cleandata`).
+
+### 0.2. Kiểm tra Python Unit Tests
+* **Lệnh chạy**:
+  ```bash
+  source venv/bin/activate
+  python src/mapreduce/test_district_parsing.py
+  deactivate
+  ```
+* **Kỳ vọng**: In ra danh sách các test case và thông báo "All checks passed ✅".
 
 ---
 
@@ -55,9 +77,15 @@ Mục tiêu: Xác minh quá trình ETL đã cào dữ liệu và đẩy vào DB 
 ### 3.1. MySQL (Dữ liệu đã làm sạch)
 * **Lệnh chạy**:
   ```bash
-  mysql -u root -proot -e "USE food_sentiment_db; SHOW TABLES; SELECT COUNT(*) AS total_restaurants FROM restaurants; SELECT COUNT(*) AS total_reviews FROM reviews; SELECT COUNT(*) AS total_meals FROM meals;"
+  mysql -h 127.0.0.1 -u root food_sentiment_db -e "
+    SHOW TABLES;
+    SELECT COUNT(*) AS total_restaurants FROM restaurants;
+    SELECT COUNT(*) AS total_reviews FROM reviews;
+    SELECT COUNT(*) AS total_meals FROM meals;
+    SELECT id, name, district_parsed, city FROM restaurants LIMIT 3;
+  "
   ```
-* **Kỳ vọng**: Trả về danh sách 3 bảng và số lượng records phải lớn hơn 0 (ví dụ: restaurants ~ 1334, meals ~ 666).
+* **Kỳ vọng**: Trả về danh sách 3 bảng, số lượng records lớn hơn 0, và dữ liệu cột `district_parsed` được extract chính xác, không phải "Unknown".
 
 ### 3.2. MongoDB (Dữ liệu thô)
 * **Lệnh chạy**:
@@ -76,15 +104,14 @@ Mục tiêu: Dữ liệu đã ở trên HDFS và Hive đã map thành bảng Ext
   ```bash
   hdfs dfs -ls -R /data/raw
   ```
-* **Kỳ vọng**: Liệt kê cấu trúc thư mục chứa các file `.jsonl` hoặc dữ liệu đã đồng bộ từ RDBMS/MongoDB.
+* **Kỳ vọng**: Liệt kê cấu trúc thư mục chứa các file `/data/raw/restaurants/restaurants.jsonl` và `/data/raw/meals/meals.jsonl`.
 
 ### 4.2. Truy vấn Apache Hive
 * **Lệnh chạy**:
   ```bash
-  hive -e "USE food_sentiment_db; SHOW TABLES; SELECT * FROM mysql_restaurants LIMIT 3;"
+  hive -e "USE food_sentiment_db; SHOW TABLES; SELECT * FROM mr_rating_by_district LIMIT 3;"
   ```
-  *(Thay `mysql_restaurants` bằng tên bảng tương ứng trong `hive_schema.sql` của bạn)*
-* **Kỳ vọng**: Truy cập Metastore thành công, hiển thị các bảng và in ra 3 dòng dữ liệu hợp lệ (không chứa giá trị `NULL` đồng loạt - nếu `NULL` đồng loạt nghĩa là SerDe bị sai).
+* **Kỳ vọng**: Truy cập Metastore thành công, hiển thị các bảng Hive View đã tạo và in ra 3 dòng dữ liệu hợp lệ (nếu MapReduce job đã chạy).
 
 ---
 
@@ -97,7 +124,6 @@ Mục tiêu: Đảm bảo luồng chạy job MapReduce thông qua thư viện `m
   python src/mapreduce/mr_rating_by_district.py -r hadoop hdfs:///data/raw/restaurants/restaurants.jsonl
   deactivate
   ```
-  *(Lưu ý: Thay thế đường dẫn `hdfs:///...` trỏ đúng vào file dữ liệu đầu vào trên HDFS)*
 * **Kỳ vọng**: Hadoop YARN sẽ cấp phát container, khởi chạy Map và Reduce tasks (sẽ hiển thị log tiến trình như `map 0% reduce 0%` -> `map 100% reduce 100%`). Cuối cùng sẽ in ra kết quả phân tích thống kê (điểm trung bình rating theo từng quận).
 
 ---
@@ -107,10 +133,11 @@ Mục tiêu: Test kịch bản DevOps tự động sao lưu an toàn CSDL.
 
 * **Lệnh chạy**:
   ```bash
+  # MySQL và MongoDB phải đang chạy
   bash src/backup/db_backup.sh
-  ls -lah /data/backups/
+  ls -lah data/backups/
   ```
-* **Kỳ vọng**: Bash script không báo lỗi. Thư mục `/data/backups/` có sinh ra một folder chứa timestamp (ví dụ: `20260614_xxx`) và bên trong chứa các tệp tin dump (`.sql` cho MySQL và `.bson` cho MongoDB) có dung lượng > 0 bytes.
+* **Kỳ vọng**: Bash script không báo lỗi. Thư mục `data/backups/` có sinh ra một folder chứa timestamp (ví dụ: `backup_20260614_xxx`) và bên trong chứa các tệp tin dump (`.sql` cho MySQL và `.bson`/`.archive` cho MongoDB) có dung lượng > 0 bytes.
 
 ---
 
