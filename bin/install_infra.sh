@@ -341,15 +341,9 @@ runners:
     python_bin: ${BASE_DIR}/venv/bin/python3
 EOF
 
-# Initialize database schemas with seed data
-echo "[*] Importing offline TripAdvisor data to MongoDB..."
-python "${BASE_DIR}/src/ingest/import_tripadvisor.py" || echo "[!] import_tripadvisor.py failed."
-
-echo "[*] Loading offline meals data to MongoDB..."
-python "${BASE_DIR}/src/crawler/fetch_mealdb.py" --offline || echo "[!] fetch_mealdb.py failed."
-
-echo "[*] Running init_db.py to initialize MySQL schema and migrate data..."
-python "${BASE_DIR}/src/ingest/init_db.py" || echo "[!] init_db.py failed — run manually after services are ready."
+# Initialize database schemas with seed data (Delegated to bin/ingest.sh)
+echo "[*] Database initialization has been moved to a separate script."
+echo "    After activating your virtual environment, please run: bash bin/ingest.sh"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # DONE

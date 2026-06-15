@@ -42,13 +42,20 @@ Chạy script cài đặt toàn bộ hạ tầng (chỉ chạy 1 lần duy nhấ
 6. Cài đặt Python 3.10/3.11, tạo môi trường ảo `venv` và cài đặt các package trong `requirements.txt`.
 7. Tải và giải nén Apache Hadoop 3.3.6, copy cấu hình từ `conf/hadoop/*.xml`, định dạng NameNode.
 8. Tải và cấu hình Apache Hive 3.1.3, tải MySQL JDBC Connector, khắc phục lỗi thư viện Guava.
-9. Khởi tạo Database cho Hive Metastore Schema và chạy `src/ingest/init_db.py` để nạp dữ liệu mẫu ban đầu từ thư mục `src/crawler/seed/`.
 
 ### Bước 2.4: Reload biến môi trường
 Sau khi `install_infra.sh` hoàn thành, bạn **cần nạp lại (reload) biến môi trường** của terminal hiện tại để áp dụng các thay đổi:
 ```bash
 source ~/.bashrc
 ```
+
+### Bước 2.5: Nạp dữ liệu gốc vào hệ thống (Ingest Data)
+Sau khi môi trường ảo `venv` và các dịch vụ nền đã sẵn sàng, hãy thực hiện phân quyền và chạy script nạp dữ liệu offline vào database:
+```bash
+chmod +x bin/ingest.sh
+./bin/ingest.sh
+```
+Script này sẽ tự động kích hoạt `venv` và nạp dữ liệu sạch từ local vào MongoDB + khởi tạo MySQL Schema & di cư dữ liệu.
 
 ---
 
