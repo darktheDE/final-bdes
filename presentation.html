@@ -252,6 +252,43 @@
   ::-webkit-scrollbar { width: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 5px; }
+
+  /* ─── PRINT RULES ─── */
+  @media print {
+    @page {
+      size: landscape;
+      margin: 0;
+    }
+    html, body {
+      height: auto !important;
+      overflow: visible !important;
+      background: var(--bg) !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .nav, .kbd {
+      display: none !important;
+    }
+    .deck {
+      display: block !important;
+      height: auto !important;
+      width: auto !important;
+    }
+    .slide {
+      display: flex !important;
+      position: relative !important;
+      inset: auto !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      page-break-after: always !important;
+      break-after: page !important;
+      overflow: hidden !important;
+      animation: none !important;
+      opacity: 1 !important;
+      transform: none !important;
+      box-sizing: border-box !important;
+    }
+  }
 </style>
 </head>
 <body>

@@ -266,3 +266,43 @@ mysql -h 127.0.0.1 -u root food_sentiment_db -e "SELECT name, district_parsed, c
 
 #### `.gitignore`
 - Đã đầy đủ (`venv/`, `tmp-pandas/`, `data/backups/`, etc.) — không cần thay đổi
+
+---
+
+## Module 7: Fixing Subprocess Hive Queries & Rating Distribution View
+
+**Ngày thực hiện**: 2026-06-15
+**Mục tiêu**: Điều tra và sửa lỗi hiển thị biểu đồ trên Streamlit (Chart 4, Chart 5, Chart 3) do YARN classpath thiếu Class `JsonSerDe` và lỗi aggregation của `FLOOR` trong local mode.
+
+### Vấn đề phát hiện
+
+1. **Lỗi `ClassNotFoundException` trên YARN (Chart 4 & Chart 5)**: 
+   - Khi chạy Streamlit ở chế độ `subprocess` (chạy `hive -S -e`), các truy vấn Hive OLAP được gom thành batch gửi qua CLI. Do YARN chạy các task MapReduce trên container độc lập, nó không tìm thấy class `org.apache.hive.hcatalog.data.JsonSerDe` dẫn đến lỗi `return code 2` từ Hive.
+   - Hàm `_query_via_pyhive` đã có cấu hình `set hive.exec.mode.local.auto=true` để chạy trong local mode (bỏ qua YARN) tránh thiếu RAM/conflict classpath, nhưng các hàm chạy subprocess CLI (`_query_via_subprocess` và `batch_query_all_views` trong `hive_connector.py`, và `run_hive_query` trong `app.py`) lại chưa được cấu hình.
+2. **Biểu đồ số sao (Chart 3) hiển thị sai dữ liệu (chỉ có 0 sao)**:
+   - Trong view `view_review_distribution`, trường `stars` được định nghĩa bằng biểu thức `CAST(FLOOR(rating) AS INT)`. Tuy nhiên, khi gom nhóm và chạy dưới Hive trong local mode, biểu thức này bị lỗi type coercion khiến tất cả các rating từ 1-5 sao đều bị trả về `0`, dẫn đến toàn bộ dữ liệu (44,863 đánh giá) bị gộp vào nhóm 0 sao.
+3. **Các view OLAP chưa được load**:
+   - Các view phân tích OLAP mới trong `src/ingest/hive_analytics.sql` chưa được chạy tự động trong setup script dẫn đến việc metadata của metastore vẫn giữ các view cũ (`view_price_segment` và `view_sentiment_by_price`), gây lỗi khi Streamlit cố truy vấn các cột không tồn tại.
+
+### Thay đổi thực hiện
+
+#### `src/streamlit_app/hive_connector.py`
+- **Cập nhật** hàm `_query_via_subprocess` prepending `set hive.exec.mode.local.auto=true;` vào câu lệnh SQL để ép Hive thực thi local.
+- **Cập nhật** hàm `batch_query_all_views` prepending `set hive.exec.mode.local.auto=true;` vào batch script.
+
+#### `src/streamlit_app/app.py`
+- **Cập nhật** hàm `run_hive_query` (dự phòng) prepending `set hive.exec.mode.local.auto=true;` vào sql.
+
+#### `src/ingest/hive_analytics.sql`
+- **Cập nhật** định nghĩa của `view_review_distribution` thay vì dùng `CAST(FLOOR(rating) AS INT)` chuyển sang dùng `CAST(rating AS INT)`. Vì rating của reviews chỉ chứa các giá trị số nguyên lưu dưới dạng float (1.0, 2.0, 3.0, 4.0, 5.0), việc cast trực tiếp sang `INT` đảm bảo độ chính xác hoàn toàn và khắc phục triệt để lỗi gom nhóm về 0 của Hive.
+
+### Hướng dẫn kiểm tra và kích hoạt thủ công
+Chạy các lệnh sau trong WSL2 để tạo lại schema và view mới trong Hive:
+```bash
+# 1. Chạy lại schema để khởi tạo DB và các external tables
+hive -f src/ingest/hive_schema.sql
+
+# 2. Chạy lại file view phân tích OLAP
+hive -f src/ingest/hive_analytics.sql
+```
+

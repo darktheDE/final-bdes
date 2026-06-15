@@ -121,14 +121,15 @@ LIMIT 20;
 DROP VIEW IF EXISTS view_review_distribution;
 CREATE VIEW view_review_distribution AS
 SELECT
-    CAST(FLOOR(rating) AS INT) AS stars,
-    COUNT(*)                   AS cnt
+    CAST(rating AS INT) AS stars,
+    COUNT(*)            AS cnt
 FROM mysql_reviews
 WHERE rating IS NOT NULL
   AND rating >= 1
   AND rating <= 5
-GROUP BY CAST(FLOOR(rating) AS INT)
+GROUP BY CAST(rating AS INT)
 ORDER BY stars ASC;
+
 
 
 -- ────────────────────────────────────────────────────────────

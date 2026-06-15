@@ -75,7 +75,7 @@ def run_hive_query(query):
     try:
         # Using hive -e with sed to remove warnings and keep only output
         # Setting hive.cli.print.header=true gives us headers
-        full_query = f"set hive.cli.print.header=true; {query}"
+        full_query = f"set hive.exec.mode.local.auto=true; set hive.cli.print.header=true; {query}"
         result = subprocess.check_output(['hive', '-S', '-e', full_query], stderr=subprocess.STDOUT)
         
         # Parse TSV

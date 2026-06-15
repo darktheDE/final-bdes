@@ -112,7 +112,7 @@ def _query_via_pyhive(sql: str, database: str) -> pd.DataFrame:
 
 def _query_via_subprocess(sql: str, database: str) -> pd.DataFrame:
     """Execute SQL through `hive -S -e` subprocess and parse TSV output."""
-    full_sql = f"set hive.cli.print.header=true; USE {database}; {sql}"
+    full_sql = f"set hive.exec.mode.local.auto=true; set hive.cli.print.header=true; USE {database}; {sql}"
     result = subprocess.check_output(
         ["hive", "-S", "-e", full_sql],
         stderr=subprocess.STDOUT,
@@ -200,7 +200,7 @@ def batch_query_all_views() -> dict[str, pd.DataFrame]:
         if i < len(BATCH_QUERIES) - 1:
             sql_parts.append(f"!echo {_BATCH_SEP};")
 
-    full_sql = f"USE food_sentiment_db; " + " ".join(sql_parts)
+    full_sql = f"set hive.exec.mode.local.auto=true; USE food_sentiment_db; " + " ".join(sql_parts)
 
     try:
         proc = subprocess.run(
