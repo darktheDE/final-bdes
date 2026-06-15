@@ -5,6 +5,12 @@ import pymongo
 import mysql.connector
 from mysql.connector import errorcode
 
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+from src.common.location_utils import clean_location_text, extract_admin_area, normalize_city
+
 # MongoDB Configuration
 MONGO_URI = "mongodb://localhost:27017/"
 MONGO_DB_NAME = "sentiment_db"
@@ -121,6 +127,16 @@ def _normalize_city(city_str: str) -> str:
     # Clean extra whitespace
     s = re.sub(r'\s+', ' ', s).strip().strip(',').strip()
     return s if s else 'Unknown'
+
+
+def _extract_district(address_or_district: str) -> str:
+    """Shared area extractor override used by the ingestion pipeline."""
+    return extract_admin_area(address_or_district)
+
+
+def _normalize_city(city_str: str) -> str:
+    """Shared city normalizer override used by the ingestion pipeline."""
+    return normalize_city(city_str)
 
 
 def _parse_review_rating(rating_val) -> float | None:
@@ -377,14 +393,15 @@ def migrate_data():
         review_count_raw = r.get('review_count', 0)
         rev_count = _parse_review_count(review_count_raw)
 
-        address = r.get('address') or ''
+        address_raw = clean_location_text(r.get('address'))
 
-        # district field from TripAdvisor is actually the full street address
-        district_raw = r.get('district', '') or ''
-        district_parsed = _extract_district(district_raw)
+        # Some TripAdvisor records place admin info in `district`, others only in `address`.
+        district_raw = clean_location_text(r.get('district'))
+        city_raw = clean_location_text(r.get('city'))
 
-        city_raw = r.get('city', '') or ''
-        city = _normalize_city(city_raw)
+        address = address_raw or district_raw or ''
+        district_parsed = extract_admin_area(district_raw, address_raw, city_raw)
+        city = normalize_city(city_raw, address_raw, district_raw)
 
         try:
             cursor.execute(rest_insert_stmt, (

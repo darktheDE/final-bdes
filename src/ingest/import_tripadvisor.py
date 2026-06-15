@@ -2,7 +2,13 @@ import json
 import os
 import re
 import pymongo
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if PROJECT_ROOT not in os.sys.path:
+    os.sys.path.insert(0, PROJECT_ROOT)
+
 from init_db import _parse_review_count, _extract_district, _normalize_city, _parse_review_rating, _make_short_id
+from src.common.location_utils import clean_location_text, extract_admin_area, normalize_city
 
 MONGO_URI = "mongodb://localhost:27017/"
 DB_NAME = "sentiment_db"
@@ -46,6 +52,11 @@ def _smart_district_parsed(district_raw: str) -> str:
     return _extract_district(s)
 
 
+def _smart_district_parsed_v2(*location_parts: str) -> str:
+    """Shared area extractor override for the JSON import flow."""
+    return extract_admin_area(*location_parts)
+
+
 def clean_restaurant(rest):
     """Normalize và clean một bản ghi restaurant từ dataset mới."""
     raw_id = rest.get('_id', rest.get('url', ''))
@@ -55,11 +66,15 @@ def clean_restaurant(rest):
     # review_count trong dataset mới đã là int, _parse_review_count xử lý cả hai dạng
     rest['review_count'] = _parse_review_count(rest.get('review_count'))
 
-    district_raw = rest.get('district', '') or ''
-    rest['district_parsed'] = _smart_district_parsed(district_raw)
+    district_raw = clean_location_text(rest.get('district'))
+    address_raw = clean_location_text(rest.get('address'))
+    city_raw = clean_location_text(rest.get('city'))
 
-    city_raw = rest.get('city', '') or ''
-    rest['city'] = _normalize_city(city_raw)
+    if not address_raw and district_raw:
+        rest['address'] = district_raw
+
+    rest['district_parsed'] = _smart_district_parsed_v2(district_raw, address_raw, city_raw)
+    rest['city'] = normalize_city(city_raw, address_raw, district_raw)
 
     cleaned_reviews = []
     for r in rest.get('reviews', []):

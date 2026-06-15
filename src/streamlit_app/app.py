@@ -150,7 +150,7 @@ def render_crud_page():
         st.subheader("View Restaurants")
         col1, col2 = st.columns([3, 1])
         with col1:
-            search_term = st.text_input("Search by ID, Name or District:", "")
+            search_term = st.text_input("Search by ID, Name or District / Ward:", "")
         with col2:
             records_per_page = st.selectbox("Records per page", [10, 20, 50, 100], index=1)
         
@@ -160,8 +160,15 @@ def render_crud_page():
         if st.button("Search"):
             if search_term:
                 cursor.execute(
-                    "SELECT * FROM restaurants WHERE id LIKE %s OR name LIKE %s OR district LIKE %s LIMIT %s OFFSET %s", 
-                    (f"%{search_term}%", f"%{search_term}%", f"%{search_term}%", records_per_page, offset)
+                    "SELECT * FROM restaurants WHERE id LIKE %s OR name LIKE %s OR district LIKE %s OR district_parsed LIKE %s LIMIT %s OFFSET %s",
+                    (
+                        f"%{search_term}%",
+                        f"%{search_term}%",
+                        f"%{search_term}%",
+                        f"%{search_term}%",
+                        records_per_page,
+                        offset,
+                    )
                 )
             else:
                 cursor.execute("SELECT * FROM restaurants LIMIT %s OFFSET %s", (records_per_page, offset))
@@ -181,7 +188,7 @@ def render_crud_page():
             rating = st.number_input("Rating", min_value=0.0, max_value=5.0, value=0.0, step=0.1)
             rev_count = st.number_input("Review Count", min_value=0, value=0)
             address = st.text_input("Address")
-            district = st.text_input("District")
+            district = st.text_input("District / Ward")
             city = st.text_input("City", value="HCMC")
             
             submit = st.form_submit_button("Insert Record")
@@ -204,7 +211,7 @@ def render_crud_page():
             new_name = st.text_input("New Name")
             new_rating = st.number_input("New Rating (0.0 to ignore)", min_value=0.0, max_value=5.0, value=0.0, step=0.1)
             new_address = st.text_input("New Address")
-            new_district = st.text_input("New District")
+            new_district = st.text_input("New District / Ward")
             new_city = st.text_input("New City")
             
             update_submit = st.form_submit_button("Update")
@@ -353,7 +360,7 @@ def render_reports_page():
             try:
                 fig_bar1 = px.bar(
                     df_dist, x="district", y="avg_rating",
-                    title="Ratings per District",
+                    title="Ratings per Area",
                     color="avg_rating",
                     color_continuous_scale="Oranges",
                     hover_data={"total_count": True, "avg_rating": ":.2f"},
@@ -410,7 +417,7 @@ def render_reports_page():
             try:
                 fig_bar2 = px.bar(
                     df_top, x="restaurant_count", y="district", orientation='h',
-                    title="Top Districts by Restaurant Count",
+                    title="Top Areas by Restaurant Count",
                     color="restaurant_count",
                     color_continuous_scale="Viridis",
                     hover_data={"avg_rating": True, "restaurant_count": True},

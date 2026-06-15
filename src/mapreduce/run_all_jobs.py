@@ -21,7 +21,7 @@ JOBS = [
         "script": "src/mapreduce/mr_rating_by_district.py",
         "input": HDFS_RAW_RESTAURANTS,
         "output": f"{HDFS_OUTPUT_DIR}/mr_rating_by_district",
-        "extra_args": []
+        "extra_args": ["--file", "src/mapreduce/location_utils.py"]
     },
     {
         "name": "Cuisine Count",
