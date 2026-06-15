@@ -343,9 +343,18 @@ def render_reports_page():
     else:
         data = st.session_state[cache_key]
 
+    with st.expander("🛠️ Debug Information (Hive Connection)"):
+        st.write(f"**Detected Mode:** {hive_mode}")
+        for k, v in data.items():
+            if v is None or v.empty:
+                st.error(f"{k}: EMPTY OR ERROR")
+            else:
+                st.success(f"{k}: {len(v)} rows")
+
     def get_df(view_key: str) -> pd.DataFrame:
         df = data.get(view_key, pd.DataFrame())
         return df
+
 
     # ── Charts grid ───────────────────────────────────────────────────────────
     col1, col2 = st.columns(2)
