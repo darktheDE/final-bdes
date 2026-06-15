@@ -36,6 +36,58 @@ HIVE_QUERY_TIMEOUT = 180
 # ──────────────────────────────────────────────────────────────────────────────
 _HIVE_MODE: Optional[str] = None  # "live" | "subprocess" | "offline"
 
+# Pre-computed representative mock DataFrames for fallback/offline display
+_OFFLINE_MOCK_DATA: dict[str, pd.DataFrame] = {
+    "view_rating_by_district": pd.DataFrame([
+        {"district": "Quận 1", "avg_rating": 4.5, "total_count": 120},
+        {"district": "Quận 3", "avg_rating": 4.3, "total_count": 95},
+        {"district": "Quận 5", "avg_rating": 4.2, "total_count": 80},
+        {"district": "Quận 7", "avg_rating": 4.4, "total_count": 110},
+        {"district": "Quận 10", "avg_rating": 4.1, "total_count": 75},
+        {"district": "Bình Thạnh", "avg_rating": 4.25, "total_count": 90},
+        {"district": "Tân Bình", "avg_rating": 4.05, "total_count": 65},
+    ]),
+    "view_cuisine_frequency": pd.DataFrame([
+        {"category": "Beef", "cnt": 150},
+        {"category": "Chicken", "cnt": 120},
+        {"category": "Pork", "cnt": 95},
+        {"category": "Seafood", "cnt": 80},
+        {"category": "Vegetarian", "cnt": 60},
+        {"category": "Dessert", "cnt": 45},
+    ]),
+    "view_top_districts": pd.DataFrame([
+        {"district": "Quận 1", "restaurant_count": 45, "avg_rating": 4.5},
+        {"district": "Quận 7", "restaurant_count": 38, "avg_rating": 4.4},
+        {"district": "Quận 3", "restaurant_count": 32, "avg_rating": 4.3},
+        {"district": "Bình Thạnh", "restaurant_count": 28, "avg_rating": 4.25},
+        {"district": "Quận 5", "restaurant_count": 25, "avg_rating": 4.2},
+    ]),
+    "view_rating_histogram": pd.DataFrame([
+        {"rating_group": "4.5-5 sao (Xuất sắc)", "restaurant_count": 180},
+        {"rating_group": "4-4.5 sao (Tốt)", "restaurant_count": 250},
+        {"rating_group": "3-4 sao (Trung bình)", "restaurant_count": 120},
+        {"rating_group": "2-3 sao (Dưới TB)", "restaurant_count": 45},
+        {"rating_group": "1-2 sao (Kém)", "restaurant_count": 15},
+    ]),
+    "view_review_distribution": pd.DataFrame([
+        {"stars": 1, "cnt": 15},
+        {"stars": 2, "cnt": 30},
+        {"stars": 3, "cnt": 85},
+        {"stars": 4, "cnt": 280},
+        {"stars": 5, "cnt": 620},
+    ]),
+    "view_delivery_sentiment": pd.DataFrame([
+        {"service_type": "Delivery", "avg_rating": 4.250, "review_count": 450},
+        {"service_type": "Dine-in", "avg_rating": 4.450, "review_count": 820},
+    ]),
+    "view_cuisine_area": pd.DataFrame([
+        {"area": "Vietnamese", "meal_count": 24},
+        {"area": "Italian", "meal_count": 18},
+        {"area": "Chinese", "meal_count": 15},
+        {"area": "Japanese", "meal_count": 12},
+    ]),
+}
+
 
 def _probe_hiveserver2() -> bool:
     """Return True if HiveServer2 is reachable on localhost:10000 via pyhive."""
@@ -92,20 +144,27 @@ def get_hive_status() -> str:
 
 
 def _query_via_pyhive(sql: str, database: str) -> pd.DataFrame:
-    """Execute SQL through pyhive and return a DataFrame."""
+    """Execute SQL through pyhive and return a DataFrame.
+
+    Dùng cursor trực tiếp thay vì pd.read_sql() để đảm bảo lệnh SET
+    hive.exec.mode.local.auto=true có hiệu lực trong cùng một session.
+    (pd.read_sql tạo cursor mới bên trong, làm mất SET đã chạy trước đó.)
+    """
     from pyhive import hive  # type: ignore
 
     conn = hive.connect(host="localhost", port=10000, database=database)
     try:
-        # Bật chế độ Local Mode để Hive tự xử lý SQL trong RAM
-        # Giúp tránh đẩy Job lên YARN gây lỗi "return code 2" do thiếu RAM/Java conflict
         cursor = conn.cursor()
+        # SET phải chạy trên cùng cursor với query để có hiệu lực
         cursor.execute("set hive.exec.mode.local.auto=true")
-        
-        df = pd.read_sql(sql, conn)
+        cursor.execute("set hive.exec.mode.local.auto.inputbytes.max=134217728")
+        cursor.execute(sql)
+        rows = cursor.fetchall()
+        if not rows:
+            return pd.DataFrame()
         # Strip table-prefix from column names (pyhive may return "tablename.col")
-        df.columns = [c.split(".")[-1] for c in df.columns]
-        return df
+        cols = [desc[0].split(".")[-1] for desc in cursor.description]
+        return pd.DataFrame(rows, columns=cols)
     finally:
         conn.close()
 
@@ -166,18 +225,19 @@ BATCH_QUERIES: list[tuple[str, str]] = [
 ]
 
 
-def batch_query_all_views() -> dict[str, pd.DataFrame]:
+def batch_query_all_views(use_mock_data: bool = False) -> dict[str, pd.DataFrame]:
     """
     Run all 6 analytics views in a single Hive subprocess call.
 
     Returns a dict mapping view_key -> pd.DataFrame.
-    Falls back to mock data for any view that fails to parse.
-    Falls back entirely to mock data if subprocess fails.
     """
+    if use_mock_data:
+        return {key: df.copy() for key, df in _OFFLINE_MOCK_DATA.items()}
+
     mode = get_hive_status()
 
     if mode == "offline":
-        return {}
+        return {key: pd.DataFrame() for key, _ in BATCH_QUERIES}
 
     if mode == "live":
         # pyhive: still run individually (connection reuse is handled by the driver)
@@ -185,7 +245,7 @@ def batch_query_all_views() -> dict[str, pd.DataFrame]:
         for key, sql in BATCH_QUERIES:
             try:
                 df = _query_via_pyhive(sql, "food_sentiment_db")
-                results[key] = df if not df.empty else pd.DataFrame()
+                results[key] = df if (df is not None and not df.empty) else pd.DataFrame()
             except Exception as exc:
                 logger.warning("pyhive batch query failed for %s: %s", key, exc)
                 results[key] = pd.DataFrame()
@@ -211,10 +271,10 @@ def batch_query_all_views() -> dict[str, pd.DataFrame]:
         )
         raw = proc.stdout + proc.stderr
     except subprocess.TimeoutExpired:
-        logger.warning("Batch Hive query timed out after %ds, using empty data", HIVE_QUERY_TIMEOUT)
+        logger.warning("Batch Hive query timed out after %ds", HIVE_QUERY_TIMEOUT)
         return {key: pd.DataFrame() for key, _ in BATCH_QUERIES}
     except Exception as exc:
-        logger.warning("Batch Hive query failed: %s, using empty data", exc)
+        logger.warning("Batch Hive query failed: %s", exc)
         return {key: pd.DataFrame() for key, _ in BATCH_QUERIES}
 
     # Split output on sentinel
@@ -251,35 +311,41 @@ def batch_query_all_views() -> dict[str, pd.DataFrame]:
     return results
 
 
-
-
-
 # ──────────────────────────────────────────────────────────────────────────────
 # Public API
 # ──────────────────────────────────────────────────────────────────────────────
 
-def query_hive(sql: str, database: str = "food_sentiment_db") -> pd.DataFrame:
+def query_hive(sql: str, database: str = "food_sentiment_db", use_mock_data: bool = False) -> pd.DataFrame:
     """
     Execute a HiveQL query and return results as a pandas DataFrame.
 
     Automatically selects the best available connection mode:
     - pyhive (live TCP connection to HiveServer2) if available.
     - subprocess hive CLI as fallback.
-    - Pre-computed offline mock DataFrames as last resort.
+    - Pre-computed offline mock DataFrames as last resort (if enabled).
 
     Args:
-        sql:      HiveQL SELECT statement or VIEW reference.
-        database: Hive database context (default: food_sentiment_db).
+        sql:           HiveQL SELECT statement or VIEW reference.
+        database:      Hive database context (default: food_sentiment_db).
+        use_mock_data: If True, return mock data immediately.
 
     Returns:
-        pd.DataFrame with query results. Never raises; returns empty
-        DataFrame or mock data on any failure.
+        pd.DataFrame with query results.
     """
+    if use_mock_data:
+        sql_lower = sql.lower()
+        for key, df in _OFFLINE_MOCK_DATA.items():
+            if key in sql_lower:
+                return df.copy()
+        return pd.DataFrame()
+
     mode = get_hive_status()
 
     if mode == "live":
         try:
-            return _query_via_pyhive(sql, database)
+            df = _query_via_pyhive(sql, database)
+            if df is not None and not df.empty:
+                return df
         except Exception as exc:
             logger.warning("pyhive query failed, trying subprocess: %s", exc)
             # Downgrade mode for subsequent calls
@@ -289,13 +355,14 @@ def query_hive(sql: str, database: str = "food_sentiment_db") -> pd.DataFrame:
 
     if mode == "subprocess":
         try:
-            return _query_via_subprocess(sql, database)
+            df = _query_via_subprocess(sql, database)
+            if df is not None and not df.empty:
+                return df
         except Exception as exc:
-            logger.warning("hive CLI query failed, using mock: %s", exc)
+            logger.warning("hive CLI query failed: %s", exc)
             _HIVE_MODE = "offline"
             mode = "offline"
 
-    # mode == "offline"
     return pd.DataFrame()
 
 

@@ -18,6 +18,31 @@ try:
 except ImportError:
     _HIVE_CONNECTOR_AVAILABLE = False
 
+def ensure_mrjob_conf():
+    app_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.abspath(os.path.join(app_dir, "../.."))
+    conf_dir = os.path.join(project_root, "conf")
+    conf_path = os.path.join(conf_dir, "mrjob.conf")
+    
+    python_bin = os.path.join(project_root, "venv/bin/python3")
+    if not os.path.exists(python_bin):
+        python_bin = sys.executable
+        
+    config_content = f"""runners:
+  hadoop:
+    python_bin: {python_bin}
+  local:
+    python_bin: {python_bin}
+"""
+    try:
+        os.makedirs(conf_dir, exist_ok=True)
+        with open(conf_path, "w", encoding="utf-8") as f:
+            f.write(config_content)
+    except Exception:
+        pass
+
+ensure_mrjob_conf()
+
 # Set page layout
 st.set_page_config(page_title="Food Sentiment Analysis", layout="wide", page_icon="🍲")
 
@@ -239,7 +264,7 @@ def render_crud_page():
         if st.button("Sync từ MongoDB"):
             with st.spinner("Running init_db.py migration..."):
                 try:
-                    result = subprocess.run(["python", "src/ingest/init_db.py"], capture_output=True, text=True)
+                    result = subprocess.run([sys.executable, "src/ingest/init_db.py"], capture_output=True, text=True)
                     if result.returncode == 0:
                         st.success("Sync completed successfully!")
                         st.code(result.stdout)
@@ -281,22 +306,30 @@ def render_reports_page():
 
     st.divider()
 
-    # ── Batch load all data once, cache in session_state ──────────────────────
-    # Key includes hive_mode so a mode change triggers a fresh fetch
-    cache_key = f"hive_data_{hive_mode}"
-
-    col_refresh_top, _ = st.columns([1, 5])
+    # ── Mock Data Checkbox & Refresh ──────────────────────────────────────────
+    col_refresh_top, col_mock = st.columns([1, 5])
     with col_refresh_top:
         force_refresh = st.button(
             "🔄 Refresh Data",
             help="Re-query all Hive views (clears cached results)",
             key="refresh_data_btn",
         )
+    with col_mock:
+        use_mock_data = st.checkbox(
+            "Hiển thị dữ liệu giả lập (Mock Data)",
+            value=False,
+            help="Hiển thị dữ liệu tĩnh đã được tính toán sẵn khi Hive chưa khởi động hoặc chưa đồng bộ dữ liệu.",
+            key="use_mock_data_chk",
+        )
+
+    # ── Batch load all data once, cache in session_state ──────────────────────
+    # Key includes hive_mode and use_mock_data so change triggers fresh fetch
+    cache_key = f"hive_data_{hive_mode}_{use_mock_data}"
 
     if force_refresh or cache_key not in st.session_state:
         with st.spinner("⏳ Loading analytics data from Hive (this may take 1–2 minutes on first load)..."):
-            if _HIVE_CONNECTOR_AVAILABLE and hive_mode != "offline":
-                data = batch_query_all_views()
+            if _HIVE_CONNECTOR_AVAILABLE:
+                data = batch_query_all_views(use_mock_data=use_mock_data)
             else:
                 data = {}
         st.session_state[cache_key] = data
@@ -314,103 +347,121 @@ def render_reports_page():
         # Chart 1 — Average Rating by District (Bar)
         st.subheader("1. Đánh giá trung bình theo Quận")
         df_dist = get_df("view_rating_by_district")
-        try:
-            fig_bar1 = px.bar(
-                df_dist, x="district", y="avg_rating",
-                title="Ratings per District",
-                color="avg_rating",
-                color_continuous_scale="Oranges",
-                hover_data={"total_count": True, "avg_rating": ":.2f"},
-                text="avg_rating",
-            )
-            fig_bar1.update_traces(texttemplate="%{text:.2f}", textposition="outside")
-            fig_bar1.update_layout(coloraxis_showscale=False)
-            st.plotly_chart(fig_bar1, use_container_width=True)
-        except Exception as e:
-            st.error(f"Chart 1 render error: {e}")
+        if df_dist.empty:
+            st.warning("⚠️ Không có dữ liệu hiển thị cho biểu đồ này (Truy vấn Hive trả về rỗng hoặc lỗi).")
+        else:
+            try:
+                fig_bar1 = px.bar(
+                    df_dist, x="district", y="avg_rating",
+                    title="Ratings per District",
+                    color="avg_rating",
+                    color_continuous_scale="Oranges",
+                    hover_data={"total_count": True, "avg_rating": ":.2f"},
+                    text="avg_rating",
+                )
+                fig_bar1.update_traces(texttemplate="%{text:.2f}", textposition="outside")
+                fig_bar1.update_layout(coloraxis_showscale=False)
+                st.plotly_chart(fig_bar1, use_container_width=True)
+            except Exception as e:
+                st.error(f"Chart 1 render error: {e}")
 
         # Chart 2 — Cuisine Frequency (Donut)
         st.subheader("2. Phân bố ẩm thực (Donut)")
         df_cuis = get_df("view_cuisine_frequency")
-        try:
-            fig_pie1 = px.pie(
-                df_cuis, names="category", values="cnt",
-                hole=0.42, title="Cuisine Category Breakdown",
-                color_discrete_sequence=px.colors.qualitative.Bold,
-            )
-            fig_pie1.update_traces(textposition="inside", textinfo="percent+label")
-            st.plotly_chart(fig_pie1, use_container_width=True)
-        except Exception as e:
-            st.error(f"Chart 2 render error: {e}")
+        if df_cuis.empty:
+            st.warning("⚠️ Không có dữ liệu hiển thị cho biểu đồ này (Truy vấn Hive trả về rỗng hoặc lỗi).")
+        else:
+            try:
+                fig_pie1 = px.pie(
+                    df_cuis, names="category", values="cnt",
+                    hole=0.42, title="Cuisine Category Breakdown",
+                    color_discrete_sequence=px.colors.qualitative.Bold,
+                )
+                fig_pie1.update_traces(textposition="inside", textinfo="percent+label")
+                st.plotly_chart(fig_pie1, use_container_width=True)
+            except Exception as e:
+                st.error(f"Chart 2 render error: {e}")
 
         # Chart 3 — Review Star Distribution (Line)
         st.subheader("3. Phân phối số sao đánh giá")
         df_revs = get_df("view_review_distribution")
-        try:
-            fig_line = px.line(
-                df_revs, x="stars", y="cnt",
-                markers=True, title="Star Rating Distribution Curve",
-                color_discrete_sequence=["#fca311"],
-            )
-            fig_line.update_traces(line_width=3, marker_size=9)
-            fig_line.update_xaxes(tickvals=[1, 2, 3, 4, 5])
-            st.plotly_chart(fig_line, use_container_width=True)
-        except Exception as e:
-            st.error(f"Chart 3 render error: {e}")
+        if df_revs.empty:
+            st.warning("⚠️ Không có dữ liệu hiển thị cho biểu đồ này (Truy vấn Hive trả về rỗng hoặc lỗi).")
+        else:
+            try:
+                fig_line = px.line(
+                    df_revs, x="stars", y="cnt",
+                    markers=True, title="Star Rating Distribution Curve",
+                    color_discrete_sequence=["#fca311"],
+                )
+                fig_line.update_traces(line_width=3, marker_size=9)
+                fig_line.update_xaxes(tickvals=[1, 2, 3, 4, 5])
+                st.plotly_chart(fig_line, use_container_width=True)
+            except Exception as e:
+                st.error(f"Chart 3 render error: {e}")
 
     with col2:
         # Chart 4 — Top Districts by Restaurant Count (Horizontal Bar)
         st.subheader("4. Top Quận có nhiều nhà hàng nhất")
         df_top = get_df("view_top_districts")
-        try:
-            fig_bar2 = px.bar(
-                df_top, x="restaurant_count", y="district", orientation='h',
-                title="Top Districts by Restaurant Count",
-                color="restaurant_count",
-                color_continuous_scale="Viridis",
-                hover_data={"avg_rating": True, "restaurant_count": True},
-                text="restaurant_count",
-            )
-            fig_bar2.update_traces(texttemplate="%{text}", textposition="outside")
-            fig_bar2.update_layout(coloraxis_showscale=False, yaxis={'categoryorder':'total ascending'})
-            st.plotly_chart(fig_bar2, use_container_width=True)
-        except Exception as e:
-            st.error(f"Chart 4 render error: {e}")
+        if df_top.empty:
+            st.warning("⚠️ Không có dữ liệu hiển thị cho biểu đồ này (Truy vấn Hive trả về rỗng hoặc lỗi).")
+        else:
+            try:
+                fig_bar2 = px.bar(
+                    df_top, x="restaurant_count", y="district", orientation='h',
+                    title="Top Districts by Restaurant Count",
+                    color="restaurant_count",
+                    color_continuous_scale="Viridis",
+                    hover_data={"avg_rating": True, "restaurant_count": True},
+                    text="restaurant_count",
+                )
+                fig_bar2.update_traces(texttemplate="%{text}", textposition="outside")
+                fig_bar2.update_layout(coloraxis_showscale=False, yaxis={'categoryorder':'total ascending'})
+                st.plotly_chart(fig_bar2, use_container_width=True)
+            except Exception as e:
+                st.error(f"Chart 4 render error: {e}")
 
         # Chart 5 — Rating Histogram Breakdown (Bar)
         st.subheader("5. Phân bố nhà hàng theo nhóm sao")
         df_hist = get_df("view_rating_histogram")
-        try:
-            fig_bar_hist = px.bar(
-                df_hist, x="rating_group", y="restaurant_count",
-                title="Rating Histogram Distribution",
-                color="rating_group",
-                color_discrete_sequence=px.colors.qualitative.Pastel,
-                text="restaurant_count",
-            )
-            fig_bar_hist.update_traces(texttemplate="%{text}", textposition="outside")
-            st.plotly_chart(fig_bar_hist, use_container_width=True)
-        except Exception as e:
-            st.error(f"Chart 5 render error: {e}")
+        if df_hist.empty:
+            st.warning("⚠️ Không có dữ liệu hiển thị cho biểu đồ này (Truy vấn Hive trả về rỗng hoặc lỗi).")
+        else:
+            try:
+                fig_bar_hist = px.bar(
+                    df_hist, x="rating_group", y="restaurant_count",
+                    title="Rating Histogram Distribution",
+                    color="rating_group",
+                    color_discrete_sequence=px.colors.qualitative.Pastel,
+                    text="restaurant_count",
+                )
+                fig_bar_hist.update_traces(texttemplate="%{text}", textposition="outside")
+                st.plotly_chart(fig_bar_hist, use_container_width=True)
+            except Exception as e:
+                st.error(f"Chart 5 render error: {e}")
 
         # Chart 6 — Delivery vs Dine-in Sentiment (Scatter / Bubble)
         st.subheader("6. Delivery vs Dine-in — So sánh Sentiment")
         df_del = get_df("view_delivery_sentiment")
-        try:
-            fig_scatter = px.scatter(
-                df_del,
-                x="service_type", y="avg_rating",
-                size="review_count", color="service_type",
-                title="Delivery vs Dine-in Sentiment Comparison",
-                color_discrete_sequence=["#fca311", "#14213d"],
-                hover_data={"review_count": True, "avg_rating": ":.3f"},
-                text="avg_rating",
-            )
-            fig_scatter.update_traces(texttemplate="%{text:.2f}", textposition="top center")
-            fig_scatter.update_yaxes(range=[3.5, 5.0])
-            st.plotly_chart(fig_scatter, use_container_width=True)
-        except Exception as e:
-            st.error(f"Chart 6 render error: {e}")
+        if df_del.empty:
+            st.warning("⚠️ Không có dữ liệu hiển thị cho biểu đồ này (Truy vấn Hive trả về rỗng hoặc lỗi).")
+        else:
+            try:
+                fig_scatter = px.scatter(
+                    df_del,
+                    x="service_type", y="avg_rating",
+                    size="review_count", color="service_type",
+                    title="Delivery vs Dine-in Sentiment Comparison",
+                    color_discrete_sequence=["#fca311", "#14213d"],
+                    hover_data={"review_count": True, "avg_rating": ":.3f"},
+                    text="avg_rating",
+                )
+                fig_scatter.update_traces(texttemplate="%{text:.2f}", textposition="top center")
+                fig_scatter.update_yaxes(range=[3.5, 5.0])
+                st.plotly_chart(fig_scatter, use_container_width=True)
+            except Exception as e:
+                st.error(f"Chart 6 render error: {e}")
 
 def render_devops_page():
     st.title("⚙️ DevOps & Jobs Execution")
@@ -448,12 +499,13 @@ def render_devops_page():
                 # Run MapReduce job on Hadoop YARN
                 hdfs_base = "hdfs://localhost:9000/data/raw"
                 conf_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../conf/mrjob.conf'))
+                python_bin = sys.executable
                 if job_choice == 'mr_cuisine_count.py':
-                    cmd = ['python', f'src/mapreduce/{job_choice}', '-r', 'hadoop', '--conf-path', conf_path, f'{hdfs_base}/meals/meals.jsonl']
+                    cmd = [python_bin, f'src/mapreduce/{job_choice}', '-r', 'hadoop', '--conf-path', conf_path, f'{hdfs_base}/meals/meals.jsonl']
                 elif job_choice == 'mr_ingredient_match.py':
-                    cmd = ['python', f'src/mapreduce/{job_choice}', '-r', 'hadoop', '--conf-path', conf_path, '--file', 'src/crawler/seed/ingredients.json', f'{hdfs_base}/restaurants/restaurants.jsonl']
+                    cmd = [python_bin, f'src/mapreduce/{job_choice}', '-r', 'hadoop', '--conf-path', conf_path, '--file', 'src/crawler/seed/ingredients.json', f'{hdfs_base}/restaurants/restaurants.jsonl']
                 else:
-                    cmd = ['python', f'src/mapreduce/{job_choice}', '-r', 'hadoop', '--conf-path', conf_path, f'{hdfs_base}/restaurants/restaurants.jsonl']
+                    cmd = [python_bin, f'src/mapreduce/{job_choice}', '-r', 'hadoop', '--conf-path', conf_path, f'{hdfs_base}/restaurants/restaurants.jsonl']
                     
                 result = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 st.success(f"{job_choice} completed!")

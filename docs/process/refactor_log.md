@@ -306,3 +306,47 @@ hive -f src/ingest/hive_schema.sql
 hive -f src/ingest/hive_analytics.sql
 ```
 
+---
+
+## Module 8: HDFS Recovery, YARN Service Stabilization, and Ingestion Pipeline Verification
+
+**Ngày thực hiện**: 2026-06-15
+**Mục tiêu**: Khắc phục lỗi clusterID mismatch của DataNode, formatting NameNode, sửa lỗi signal SIGHUP của ResourceManager trên WSL2, nạp dataset mới từ `data/sentiment_db.restaurants.json` vào pipeline và verify thông qua integration tests.
+
+### Vấn đề phát hiện
+
+1. **Lỗi DataNode clusterID mismatch**: Do NameNode bị format lại nhưng DataNode vẫn giữ clusterID cũ dẫn đến DataNode bị crash khi khởi động (lỗi `All specified directories have failed to load`).
+2. **NameNode storage directory missing**: NameNode không khởi động được do thư mục `/home/kien_hung/hadoop-data/namenode` không tồn tại hoặc bị xóa.
+3. **YARN ResourceManager SIGHUP termination**: Trên WSL2, khi phiên làm việc bash (chạy từ Windows command line `wsl -d Ubuntu bash -c "..."`) kết thúc, WSL gửi tín hiệu SIGHUP (Signal 1) làm ResourceManager tiến hành rollback sang standby và shutdown, khiến YARN bị mất ResourceManager.
+4. **YARN ClassNotFoundException for JsonSerDe**: Mặc dù local mode đã được fix bằng local auto, việc chạy các MapReduce jobs lớn trên YARN cluster (pseudo-distributed mode) thực sự vẫn lỗi do các YARNChild container JVMs thiếu thư mục classpath trỏ tới Hive HCatalog libraries.
+
+### Thay đổi thực hiện
+
+#### 1. Khôi phục HDFS & YARN
+- **Xóa sạch & Re-format**: Thực hiện dừng DFS, xóa sạch các thư mục dữ liệu cũ (`namenode`, `datanode`, `namesecondary` trong `~/hadoop-data/`), chạy lệnh format NameNode sạch (`hdfs namenode -format -force`), và restart DFS. Cả NameNode và DataNode đã khởi động đồng bộ thành công với cùng một `clusterID`.
+- **YARN Service Isolation**: Khởi động ResourceManager trực tiếp với context bảo vệ tiến trình (disown) hoặc chạy ngầm độc lập để tránh nhận tín hiệu SIGHUP khi kết thúc WSL subprocess launcher session.
+
+#### 2. Đồng bộ Dataset Mới
+- **MongoDB Import**: Nạp dữ liệu từ dataset sạch `data/sentiment_db.restaurants.json` (2008 records) vào MongoDB collection `restaurants` thông qua script `import_tripadvisor.py`.
+- **MySQL Migration**: Chạy script `init_db.py` thành công để đồng bộ dữ liệu sạch sang MySQL database (chuyển đổi **2,008** restaurants, **50,749** reviews, **666** meals).
+- **HDFS Sync**: Chạy script `mongo_to_hdfs.py` và `mysql_to_hdfs.py` để đẩy toàn bộ dữ liệu sạch dạng `.jsonl` lên HDFS `/data/raw/`.
+
+#### 3. Cấu hình Hive MapReduce Classpath
+- Để các container MapReduce của Hadoop YARN tìm thấy các lớp SerDe của Hive, đã sao chép tất cả các thư viện HCatalog của Hive sang thư mục chung của Hadoop:
+  ```bash
+  cp /usr/local/hive/hcatalog/share/hcatalog/*.jar /usr/local/hadoop/share/hadoop/common/lib/
+  ```
+- Chạy lại các file `hive_schema.sql` và `hive_analytics.sql` để tạo lại các external tables và analytical views dựa trên cấu trúc dữ liệu mới.
+
+#### 4. Verification qua Integration Test
+- Chạy toàn bộ file `tests/test_all_components.py` và ghi nhận kết quả:
+  - **Service Ports**: PASS ✅ (MySQL: 3306, MongoDB: 27017, Hadoop: 9000, Hive: 10000, Streamlit: 8501)
+  - **MongoDB Ingestion**: PASS ✅ (2008 restaurants, 666 meals)
+  - **MySQL Clean Data**: PASS ✅ (2041 restaurants, 50749 reviews, 666 meals)
+  - **Hadoop HDFS Storage**: PASS ✅ (đầy đủ các file raw `.jsonl`)
+  - **Apache Hive DW Connection**: PASS ✅ (đọc thành công các view phân tích)
+  - **MapReduce Smoke Test**: PASS ✅ (chạy tổng hợp dữ liệu thành công)
+  - **DevOps Backup**: PASS ✅ (chạy sao lưu và khôi phục thành công)
+- Toàn bộ 7 bài kiểm thử tích hợp (integration tests) đều đạt trạng thái **PASS ✅**.
+
+

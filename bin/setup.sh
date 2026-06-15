@@ -39,9 +39,9 @@ if ! command -v pip3 &> /dev/null; then
 fi
 
 if ! command -v java &> /dev/null; then
-    echo "  -> java (JVM) is not installed. Installing OpenJDK 11..."
+    echo "  -> java (JVM) is not installed. Installing OpenJDK 8..."
     update_apt
-    sudo apt-get install -y openjdk-11-jdk
+    sudo apt-get install -y openjdk-8-jdk
 fi
 
 

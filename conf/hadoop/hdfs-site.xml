@@ -5,4 +5,18 @@
         <name>dfs.replication</name>
         <value>1</value>
     </property>
+    <!-- Persistent storage dirs outside /tmp to survive WSL2 restarts -->
+    <property>
+        <name>dfs.namenode.name.dir</name>
+        <value>file:///home/${user.name}/hadoop-data/namenode</value>
+    </property>
+    <property>
+        <name>dfs.datanode.data.dir</name>
+        <value>file:///home/${user.name}/hadoop-data/datanode</value>
+    </property>
+    <!-- Secondary NameNode checkpoint dir -->
+    <property>
+        <name>dfs.namenode.checkpoint.dir</name>
+        <value>file:///home/${user.name}/hadoop-data/namesecondary</value>
+    </property>
 </configuration>

@@ -44,10 +44,11 @@ done
 
 # ── Environment setup ─────────────────────────────────────────────────────────
 # Force Java 8 via JAVA_HOME — overrides any system default (e.g., Java 11)
-# On Ubuntu, openjdk-8 binary lives in jre/bin, not directly in bin/
-export JAVA_HOME="/usr/lib/jvm/java-8-openjdk-amd64/jre"
+# Use the canonical symlink path from: update-java-alternatives -l
+export JAVA_HOME="/usr/lib/jvm/java-1.8.0-openjdk-amd64"
 export HADOOP_HOME="/usr/local/hadoop"
 export HIVE_HOME="/usr/local/hive"
+export HADOOP_CLIENT_OPTS="-Xmx1024m $HADOOP_CLIENT_OPTS"
 # Prepend JAVA_HOME/bin so it takes priority over system java in PATH
 export PATH="${JAVA_HOME}/bin:${PATH}:${HADOOP_HOME}/bin:${HADOOP_HOME}/sbin:${HIVE_HOME}/bin"
 
@@ -99,12 +100,20 @@ check_port() {
 }
 
 # MySQL
-echo "  -> Starting MySQL..."
-sudo service mysql start 2>/dev/null || echo "    [!] MySQL failed to start — try: sudo service mysql start"
+if ! check_port 3306 "MySQL"; then
+    echo "  -> Starting MySQL..."
+    sudo service mysql start 2>/dev/null || echo "    [!] MySQL failed to start — try: sudo service mysql start"
+else
+    echo "  -> MySQL already running."
+fi
 
 # MongoDB
-echo "  -> Starting MongoDB..."
-sudo service mongod start 2>/dev/null || echo "    [!] MongoDB failed to start — try: sudo service mongod start"
+if ! check_port 27017 "MongoDB"; then
+    echo "  -> Starting MongoDB..."
+    sudo service mongod start 2>/dev/null || echo "    [!] MongoDB failed to start — try: sudo service mongod start"
+else
+    echo "  -> MongoDB already running."
+fi
 
 # HDFS
 if ! check_port 9000 "HDFS NameNode"; then
@@ -122,12 +131,40 @@ else
     echo "  -> Hadoop YARN already running."
 fi
 
+# Hive Metastore
+if ! check_port 9083 "Hive Metastore"; then
+    echo "  -> Starting Hive Metastore..."
+    nohup hive --service metastore > /tmp/hive-metastore.log 2>&1 &
+    sleep 3
+fi
+
+# HiveServer2
+if ! check_port 10000 "HiveServer2"; then
+    echo "  -> Starting HiveServer2..."
+    nohup hive --service hiveserver2 > /tmp/hiveserver2.log 2>&1 &
+    
+    echo "     Waiting for HiveServer2 to start (could take 15-30s)..."
+    for i in {1..30}; do
+        if check_port 10000 "HiveServer2"; then
+            echo "     [+] HiveServer2 is ready on port 10000."
+            break
+        fi
+        sleep 1
+    done
+    if ! check_port 10000 "HiveServer2"; then
+        echo "     [!] HiveServer2 did not start within 30 seconds. It may still be booting."
+    fi
+else
+    echo "  -> HiveServer2 already running."
+fi
+
 echo ""
 echo "  --- Service Port Summary ---"
 check_port 3306  "MySQL"            && echo "  [+] Port 3306  — MySQL"     || echo "  [-] Port 3306  — MySQL (not active)"
 check_port 27017 "MongoDB"          && echo "  [+] Port 27017 — MongoDB"   || echo "  [-] Port 27017 — MongoDB (not active)"
 check_port 9000  "HDFS NameNode"    && echo "  [+] Port 9000  — HDFS"      || echo "  [-] Port 9000  — HDFS (not active)"
-check_port 10000 "HiveServer2"      && echo "  [+] Port 10000 — HiveServer2" || echo "  [ ] Port 10000 — HiveServer2 (not started)"
+check_port 9083  "Hive Metastore"   && echo "  [+] Port 9083  — Hive Metastore" || echo "  [-] Port 9083  — Hive Metastore (not active)"
+check_port 10000 "HiveServer2"      && echo "  [+] Port 10000 — HiveServer2" || echo "  [-] Port 10000 — HiveServer2 (not active)"
 echo "  ----------------------------"
 
 # ── Activate Python venv ──────────────────────────────────────────────────────
@@ -138,6 +175,18 @@ if [ ! -f "${VENV_DIR}/bin/activate" ]; then
     echo "    Please run: ./bin/install_infra.sh"
     exit 1
 fi
+
+# Generate/update conf/mrjob.conf dynamically to avoid hardcoded paths
+echo "[*] Generating conf/mrjob.conf dynamically..."
+mkdir -p "${BASE_DIR}/conf"
+cat > "${BASE_DIR}/conf/mrjob.conf" << EOF
+runners:
+  hadoop:
+    python_bin: ${BASE_DIR}/venv/bin/python3
+  local:
+    python_bin: ${BASE_DIR}/venv/bin/python3
+EOF
+
 source "${VENV_DIR}/bin/activate"
 
 # ── Data Collection (only if --crawl) ─────────────────────────────────────────

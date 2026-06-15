@@ -3,7 +3,14 @@ import sys
 import os
 
 # Configuration
-PYTHON_BIN = "/mnt/d/Project/final-bdes/venv/bin/python3"
+# Detect project root and compute dynamic Python binary path in the virtual environment
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "../.."))
+PYTHON_BIN = os.path.join(PROJECT_ROOT, "venv/bin/python3")
+
+# Fallback to current sys.executable if the venv python is not found
+if not os.path.exists(PYTHON_BIN):
+    PYTHON_BIN = sys.executable
 HDFS_RAW_RESTAURANTS = "hdfs:///data/raw/restaurants/restaurants.jsonl"
 HDFS_RAW_MEALS = "hdfs:///data/raw/meals/meals.jsonl"
 HDFS_OUTPUT_DIR = "/data/output"
@@ -109,7 +116,25 @@ def print_summary(job_name, output_dir):
         print(f"    {i+1}. {k}: {v}")
     print("-" * 40 + "\n")
 
+def ensure_mrjob_conf():
+    conf_dir = os.path.join(PROJECT_ROOT, "conf")
+    conf_path = os.path.join(conf_dir, "mrjob.conf")
+    os.makedirs(conf_dir, exist_ok=True)
+    config_content = f"""runners:
+  hadoop:
+    python_bin: {PYTHON_BIN}
+  local:
+    python_bin: {PYTHON_BIN}
+"""
+    try:
+        with open(conf_path, "w", encoding="utf-8") as f:
+            f.write(config_content)
+        print(f"[*] Dynamically generated/updated {conf_path}")
+    except Exception as e:
+        print(f"[!] Warning: Could not write/update {conf_path}: {e}")
+
 def main():
+    ensure_mrjob_conf()
     print("=== Triggering all 8 MapReduce jobs on Hadoop ===")
     
     # Ensure setuptools is active

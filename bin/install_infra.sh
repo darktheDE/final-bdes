@@ -65,7 +65,7 @@ echo "[+] SSH passwordless access configured."
 # ──────────────────────────────────────────────────────────────────────────────
 echo -e "\n[Step 2/7] Checking Java 8 (OpenJDK)..."
 
-JAVA8_PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre"
+JAVA8_PATH="/usr/lib/jvm/java-1.8.0-openjdk-amd64"
 
 if java -version 2>&1 | grep -q '"1\.8'; then
     echo "[+] Java 8 already active — skipping install."
@@ -86,7 +86,7 @@ if ! grep -q "HADOOP_HOME" ~/.bashrc; then
     cat >> ~/.bashrc << 'ENVEOF'
 
 # ── Food Sentiment Analysis — Big Data Stack ──────────────────────────────────
-export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64/jre
+export JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64
 export HADOOP_HOME=/usr/local/hadoop
 export HADOOP_INSTALL=$HADOOP_HOME
 export HADOOP_MAPRED_HOME=$HADOOP_HOME
@@ -208,16 +208,16 @@ echo "[+] Hadoop config copied."
 
 # Set JAVA_HOME in hadoop-env.sh
 HADOOP_ENV="${HADOOP_HOME}/etc/hadoop/hadoop-env.sh"
-if ! grep -q "^export JAVA_HOME=/usr/lib/jvm/java-8" "${HADOOP_ENV}"; then
+if ! grep -q "^export JAVA_HOME=/usr/lib/jvm/java-1.8.0" "${HADOOP_ENV}"; then
     # Remove any existing export JAVA_HOME line to avoid duplicates
     sed -i '/^export JAVA_HOME=/d' "${HADOOP_ENV}"
-    echo 'export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64/jre' >> "${HADOOP_ENV}"
+    echo 'export JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64' >> "${HADOOP_ENV}"
 fi
 echo "[+] hadoop-env.sh JAVA_HOME configured."
 
 # Format NameNode only if it has never been formatted
-HDFS_DATA_DIR="${HOME}/hadoop_data"
-if [ ! -d "${HDFS_DATA_DIR}/dfs/name" ]; then
+HDFS_DATA_DIR="${HOME}/hadoop-data"
+if [ ! -d "${HDFS_DATA_DIR}/namenode" ]; then
     echo "[*] Formatting HDFS NameNode (first time)..."
     "${HADOOP_HOME}/bin/hdfs" namenode -format -force
 else
@@ -329,6 +329,17 @@ source "${VENV_DIR}/bin/activate"
 pip install --upgrade pip --quiet
 pip install -r "${BASE_DIR}/requirements.txt" --quiet
 echo "[+] Python dependencies installed."
+
+# Generate conf/mrjob.conf dynamically to avoid hardcoded paths
+echo "[*] Generating conf/mrjob.conf dynamically..."
+mkdir -p "${BASE_DIR}/conf"
+cat > "${BASE_DIR}/conf/mrjob.conf" << EOF
+runners:
+  hadoop:
+    python_bin: ${BASE_DIR}/venv/bin/python3
+  local:
+    python_bin: ${BASE_DIR}/venv/bin/python3
+EOF
 
 # Initialize database schemas with seed data
 echo "[*] Running init_db.py to initialize MySQL schema and load seed data..."

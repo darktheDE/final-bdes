@@ -16,7 +16,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
 
 | Milestone | Target Scope | Expected Deliverables |
 | :--- | :--- | :--- |
-| **Cycle 0** | Base Services Manual Setup | SSH, OpenJDK 11, MySQL, MongoDB, Hadoop, and Hive installation |
+| **Cycle 0** | Base Services Manual Setup | SSH, OpenJDK 8, MySQL, MongoDB, Hadoop, and Hive installation |
 | **Cycle 1** | Workspace & Dependency Sandbox | `bin/setup.sh`, `bin/run.sh` shell scripts, directory tree setup |
 | **Cycle 2** | Scrapers & DBMS Ingestion | TripAdvisor scraper, API parser, MongoDB (raw) & MySQL (cleaned) populated |
 | **Cycle 3** | HDFS Sync & Sqoop Pipelines | Sqoop or Python sync scripts, HDFS data structures verified |

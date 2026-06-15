@@ -51,15 +51,22 @@ if [ "${DO_BACKUP}" = true ]; then
 fi
 
 # ── Step 2: Stop Streamlit ────────────────────────────────────────────────────
-echo -e "\n[1/4] Stopping Streamlit..."
+echo -e "\n[1/5] Stopping Streamlit..."
 if pgrep -f "streamlit run" > /dev/null 2>&1; then
     pkill -f "streamlit run" && echo "  [+] Streamlit stopped." || echo "  [-] Could not stop Streamlit."
 else
     echo "  [*] Streamlit not running."
 fi
 
-# ── Step 3: Stop Hadoop ───────────────────────────────────────────────────────
-echo -e "\n[2/4] Stopping Hadoop (YARN + DFS)..."
+# ── Step 3: Stop Hive ─────────────────────────────────────────────────────────
+echo -e "\n[2/5] Stopping Hive Services..."
+pkill -f "hive --service metastore" || true
+pkill -f "hive --service hiveserver2" || true
+pkill -f "org.apache.hadoop.util.RunJar.*hive" || true
+echo "  [+] Hive services stopped."
+
+# ── Step 4: Stop Hadoop ───────────────────────────────────────────────────────
+echo -e "\n[3/5] Stopping Hadoop (YARN + DFS)..."
 if [ -x "${HADOOP_HOME}/sbin/stop-yarn.sh" ]; then
     "${HADOOP_HOME}/sbin/stop-yarn.sh" 2>/dev/null && echo "  [+] YARN stopped." || echo "  [-] YARN stop failed (may already be stopped)."
 else
@@ -70,15 +77,15 @@ if [ -x "${HADOOP_HOME}/sbin/stop-dfs.sh" ]; then
     "${HADOOP_HOME}/sbin/stop-dfs.sh" 2>/dev/null && echo "  [+] HDFS stopped." || echo "  [-] HDFS stop failed (may already be stopped)."
 fi
 
-# ── Step 4: Stop MongoDB ──────────────────────────────────────────────────────
-echo -e "\n[3/4] Stopping MongoDB..."
+# ── Step 5: Stop MongoDB ──────────────────────────────────────────────────────
+echo -e "\n[4/5] Stopping MongoDB..."
 sudo service mongod stop 2>/dev/null && echo "  [+] MongoDB stopped." || echo "  [*] MongoDB already stopped."
 
-# ── Step 5: Stop MySQL ────────────────────────────────────────────────────────
-echo -e "\n[4/4] Stopping MySQL..."
+# ── Step 6: Stop MySQL ────────────────────────────────────────────────────────
+echo -e "\n[5/5] Stopping MySQL..."
 sudo service mysql stop 2>/dev/null && echo "  [+] MySQL stopped." || echo "  [*] MySQL already stopped."
 
-# ── Step 6: Optional data wipe ───────────────────────────────────────────────
+# ── Step 7: Optional data wipe ───────────────────────────────────────────────
 if [ "${DO_CLEANDATA}" = true ]; then
     echo -e "\n[--cleandata] Wiping all data stores for demo reset..."
     echo "  [!] WARNING: This will permanently delete all crawled data."
