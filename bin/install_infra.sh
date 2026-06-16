@@ -200,7 +200,8 @@ export HADOOP_HOME="${HADOOP_INSTALL_DIR}"
 
 # Copy XML config files from project conf/ into Hadoop installation
 echo "[*] Copying Hadoop config from conf/hadoop/ ..."
-cp "${BASE_DIR}/conf/hadoop/core-site.xml"  "${HADOOP_HOME}/etc/hadoop/core-site.xml"
+ACTUAL_USER="${USER:-$(whoami)}"
+sed "s/USER_PLACEHOLDER/${ACTUAL_USER}/g" "${BASE_DIR}/conf/hadoop/core-site.xml" > "${HADOOP_HOME}/etc/hadoop/core-site.xml"
 cp "${BASE_DIR}/conf/hadoop/hdfs-site.xml"  "${HADOOP_HOME}/etc/hadoop/hdfs-site.xml"
 cp "${BASE_DIR}/conf/hadoop/yarn-site.xml"  "${HADOOP_HOME}/etc/hadoop/yarn-site.xml"
 cp "${BASE_DIR}/conf/hadoop/mapred-site.xml" "${HADOOP_HOME}/etc/hadoop/mapred-site.xml"

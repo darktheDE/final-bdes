@@ -93,6 +93,10 @@ echo "  [+] Version check passed."
 # ── Start Services ────────────────────────────────────────────────────────────
 echo -e "\n[1/4] Starting database and big data services..."
 
+# Update core-site.xml with active user proxy settings to avoid HiveServer2 authorization errors
+ACTUAL_USER="${USER:-$(whoami)}"
+sed "s/USER_PLACEHOLDER/${ACTUAL_USER}/g" "${BASE_DIR}/conf/hadoop/core-site.xml" > "${HADOOP_HOME}/etc/hadoop/core-site.xml"
+
 check_port() {
     local port=$1
     local name=$2
