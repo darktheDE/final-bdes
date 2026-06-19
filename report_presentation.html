@@ -1,0 +1,1378 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Báo cáo Đồ án Big Data — Toàn bộ Roles</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080c14;
+    --surface: #0f1623;
+    --surface2: #18212f;
+    --border: #1e2d42;
+    --border-hi: #2a3f5c;
+
+    --blue:   #4f8ef7;
+    --purple: #9b6ef3;
+    --cyan:   #22d3ee;
+    --green:  #22c55e;
+    --amber:  #f59e0b;
+    --red:    #f87171;
+    --pink:   #ec4899;
+
+    --blue-dim:   rgba(79,142,247,0.12);
+    --purple-dim: rgba(155,110,243,0.12);
+    --cyan-dim:   rgba(34,211,238,0.12);
+    --green-dim:  rgba(34,197,94,0.12);
+    --amber-dim:  rgba(245,158,11,0.12);
+    --red-dim:    rgba(248,113,113,0.12);
+
+    --text: #e8edf5;
+    --text2: #8fa3bf;
+    --text3: #475f7b;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); font-family: 'Inter', sans-serif; color: var(--text); }
+
+  .deck { position: relative; width: 100vw; height: 100vh; }
+
+  .slide {
+    display: none; position: absolute; inset: 0;
+    flex-direction: column; padding: 60px 80px;
+    overflow-y: auto; animation: fadein .35s ease;
+  }
+  .slide.active { display: flex; }
+  @keyframes fadein { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+
+  .nav {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 14px;
+    background: rgba(15,22,35,.95); border: 1px solid var(--border-hi);
+    backdrop-filter: blur(14px); border-radius: 60px;
+    padding: 10px 22px; z-index: 1000; box-shadow: 0 8px 40px rgba(0,0,0,.6);
+  }
+  .nav button {
+    background: none; border: none; cursor: pointer; color: var(--text2);
+    padding: 6px 16px; border-radius: 30px; font-size: 16px; font-weight: 600;
+    transition: all .2s; font-family: inherit;
+  }
+  .nav button:hover { background: var(--blue-dim); color: var(--blue); }
+  .counter { font-size: 15px; color: var(--text3); min-width: 64px; text-align: center; }
+  .dots { display: flex; gap: 6px; max-width: 300px; flex-wrap: wrap; justify-content: center; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border-hi); cursor: pointer; transition: all .2s; }
+  .dot.active { background: var(--blue); transform: scale(1.5); }
+  .kbd { position: fixed; top: 18px; right: 24px; font-size: 14px; color: var(--text3); }
+
+  .tag {
+    display: inline-block; font-size: 14px; font-weight: 700;
+    letter-spacing: .1em; text-transform: uppercase;
+    padding: 6px 16px; border-radius: 20px; border: 1px solid; margin-bottom: 24px;
+  }
+  .tag-sys { color: var(--green); border-color: rgba(34,197,94,.35); background: var(--green-dim); }
+  .tag-r1 { color: var(--blue); border-color: rgba(79,142,247,.35); background: var(--blue-dim); }
+  .tag-r2 { color: var(--purple); border-color: rgba(155,110,243,.35); background: var(--purple-dim); }
+  .tag-r3 { color: var(--cyan); border-color: rgba(34,211,238,.35); background: var(--cyan-dim); }
+  .tag-r4 { color: var(--amber); border-color: rgba(245,158,11,.35); background: var(--amber-dim); }
+  .tag-issue { color: var(--red); border-color: rgba(248,113,113,.35); background: var(--red-dim); }
+
+  h1 { font-size: clamp(48px, 6vw, 76px); font-weight: 900; line-height: 1.1; margin-bottom: 24px;}
+  h2 { font-size: clamp(36px, 4vw, 56px); font-weight: 800; line-height: 1.2; margin-bottom: 20px;}
+  .subtitle { font-size: 24px; color: var(--text2); margin-top: 12px; line-height: 1.6; max-width: 1000px; }
+  
+  .text-lg { font-size: 22px; line-height: 1.6; color: var(--text); }
+
+  .grad-blue   { background: linear-gradient(135deg,#4f8ef7,#818cf8); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .grad-purple { background: linear-gradient(135deg,#9b6ef3,#d8b4fe); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .grad-cyan   { background: linear-gradient(135deg,#22d3ee,#67e8f9); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .grad-amber  { background: linear-gradient(135deg,#f59e0b,#fcd34d); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .grad-all    { background: linear-gradient(135deg,#4f8ef7,#9b6ef3,#22c55e,#f59e0b); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+
+  .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 18px; padding: 32px;
+  }
+  
+  .tbl { width: 100%; border-collapse: collapse; font-size: 20px; }
+  .tbl th { text-align: left; padding: 16px; color: var(--text3); font-size: 16px; font-weight: 700; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+  .tbl td { padding: 20px 16px; border-bottom: 1px solid rgba(30,45,66,.6); color: var(--text2); line-height: 1.5; }
+  .tbl tr:hover td { color: var(--text); background: rgba(79,142,247,.04); }
+
+  .issue {
+    background: var(--surface); border-left: 4px solid var(--amber);
+    border-radius: 0 16px 16px 0; padding: 32px;
+  }
+  .row { display: flex; gap: 20px; align-items: flex-start; margin-bottom: 24px; }
+  .row-icon { font-size: 28px; flex-shrink: 0; }
+  .row-label { font-size: 14px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--text3); margin-bottom: 8px; }
+  .row-text { font-size: 22px; line-height: 1.6; color: var(--text); }
+  .row-text.muted { color: var(--text2); }
+
+  .checks { list-style: none; }
+  .checks li { display: flex; gap: 14px; font-size: 22px; color: var(--text2); padding: 12px 0; align-items: flex-start; line-height: 1.5; }
+  .checks li::before { content: '✓'; color: var(--green); font-weight: 700; flex-shrink: 0; }
+
+  #s1 { justify-content: center; position: relative; }
+  .hero-info { margin-top: 40px; display: grid; gap: 16px; font-size: 24px; }
+  .hero-info strong { color: var(--blue); width: 220px; display: inline-block; }
+
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 4px; }
+
+  @media print {
+    @page {
+      size: landscape;
+      margin: 0;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: visible !important;
+      background: var(--bg) !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .deck {
+      position: static !important;
+      width: 100% !important;
+      height: auto !important;
+      overflow: visible !important;
+    }
+    .slide {
+      display: flex !important;
+      position: relative !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      page-break-after: always !important;
+      break-after: page !important;
+      padding: 60px 80px !important;
+      box-sizing: border-box !important;
+      overflow: hidden !important;
+      opacity: 1 !important;
+      transform: none !important;
+      animation: none !important;
+    }
+    .nav, .kbd, .dots {
+      display: none !important;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="deck" id="deck">
+
+<!-- -------------------------- -->
+<!-- PHẦN CHUNG TỔNG QUAN       -->
+<!-- -------------------------- -->
+
+<!-- SLIDE 1: Giới thiệu -->
+<div class="slide active" id="s1">
+  <div class="tag tag-sys">Nhập môn dữ liệu lớn (Big Data Essential)</div>
+  <h1 class="grad-all">Phân tích Phân khúc Nhà hàng và Đánh giá Khách hàng tại TP.HCM</h1>
+  <div class="hero-info">
+    <div><strong>Mã môn học:</strong> BDES333877 — Nhập môn Dữ liệu lớn</div>
+    <div><strong>Giảng viên:</strong> ThS. Trần Quang Khải</div>
+    <div><strong>Lớp:</strong> 252BDES333877_04 — <strong>STT:</strong> 13</div>
+    <div style="margin-top: 20px; color: var(--text3); font-weight: 700; text-transform: uppercase; font-size: 16px; letter-spacing: 2px;">Nhóm thực hiện</div>
+    <div>1. Lê Phạm Thùy Duyên (22110122)</div>
+    <div>2. Trần Đại Sơn (22146393)</div>
+    <div>3. Vũ Kiều Thuý Vân (22110266)</div>
+    <div>4. Đinh Trọng Đức Anh (22110096)</div>
+  </div>
+</div>
+
+<!-- SLIDE 2: Vai trò các thành viên -->
+<div class="slide" id="s2">
+  <div class="tag tag-sys">Tổ chức nhóm</div>
+  <h2 class="grad-blue">Vai trò của từng thành viên</h2>
+  <div class="card" style="margin-top: 32px; flex: 1;">
+    <table class="tbl">
+      <thead><tr><th>Họ và Tên</th><th>Vai trò (Role)</th><th>Trách nhiệm chính</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong style="color:var(--text);">Lê Phạm Thùy Duyên (22110122)</strong></td>
+          <td><span style="color:var(--blue); font-weight:700;">Data Engineer & DB</span></td>
+          <td>Viết crawler TripAdvisor & gọi API TheMealDB; thiết lập pipeline dữ liệu MongoDB, MySQL, HDFS.</td>
+        </tr>
+        <tr>
+          <td><strong style="color:var(--text);">Trần Đại Sơn (22146393)</strong></td>
+          <td><span style="color:var(--purple); font-weight:700;">Hadoop Infrastructure</span></td>
+          <td>Cấu hình cài đặt toàn bộ hạ tầng dự án; viết script backup/restore dữ liệu tự động.</td>
+        </tr>
+        <tr>
+          <td><strong style="color:var(--text);">Vũ Kiều Thuý Vân (22110266)</strong></td>
+          <td><span style="color:var(--cyan); font-weight:700;">MapReduce Developer</span></td>
+          <td>Xây dựng và thực thi 8 chương trình MapReduce bằng Python (mrjob); phân tích dữ liệu dùng Apache Hive.</td>
+        </tr>
+        <tr>
+          <td><strong style="color:var(--text);">Đinh Trọng Đức Anh (22110096)</strong></td>
+          <td><span style="color:var(--amber); font-weight:700;">UI Developer</span></td>
+          <td>Phát triển Dashboard Streamlit (CRUD, charts); soạn Slides, báo cáo và làm video demo thuyết trình.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- SLIDE 3: Bài toán & Mục tiêu -->
+<div class="slide" id="s3">
+  <div class="tag tag-sys">Tổng quan Đề tài</div>
+  <h2 class="grad-blue">Bài toán Đặt ra &amp; Mục tiêu</h2>
+  <div class="g2" style="margin-top: 32px; flex: 1;">
+    <div class="card">
+      <div style="font-size: 20px; font-weight: 700; color: var(--cyan); margin-bottom: 20px; text-transform: uppercase;">Bài toán thực tế</div>
+      <p class="text-lg">Thị trường ẩm thực tại Thành phố Hồ Chí Minh vô cùng đa dạng và cạnh tranh. Tuy nhiên, dữ liệu về đánh giá của khách hàng, mức độ phổ biến của các món ăn và chất lượng dịch vụ lại nằm rải rác và không có cấu trúc.</p>
+      <br>
+      <p class="text-lg"><strong>Yêu cầu:</strong> Cần một hệ thống thu thập, lưu trữ, và xử lý phân tán lượng lớn dữ liệu đánh giá này để trích xuất các insight có giá trị kinh doanh.</p>
+    </div>
+    <div class="card">
+      <div style="font-size: 20px; font-weight: 700; color: var(--green); margin-bottom: 20px; text-transform: uppercase;">Mục tiêu Đồ án</div>
+      <ul class="checks">
+        <li>Xây dựng pipeline Big Data hoàn chỉnh từ thu thập đến trực quan hóa.</li>
+        <li>Phân tích phân khúc nhà hàng theo đánh giá (1-5 sao) và khu vực địa lý (quận/huyện).</li>
+        <li>Phân tích cảm xúc (Sentiment Analysis) từ bình luận người dùng.</li>
+        <li>Kết hợp dữ liệu công thức nấu ăn quốc tế để tìm xu hướng ẩm thực.</li>
+        <li>Sử dụng hệ sinh thái Hadoop (HDFS, YARN, Hive, MapReduce).</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 3b: Kiến trúc Pipeline -->
+<div class="slide" id="s3_pipeline">
+  <div class="tag tag-sys">Kiến trúc hệ thống</div>
+  <h2 class="grad-all">Pipeline Thu thập &amp; Xử lý Dữ liệu Lớn</h2>
+  <div class="card" style="margin-top: 20px; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;">
+    <img src="pipeline.jpg" alt="Pipeline đồ án" style="max-height: 55vh; max-width: 100%; border-radius: 12px; border: 1px solid var(--border-hi); box-shadow: 0 8px 32px rgba(0,0,0,0.5); object-fit: contain;">
+    <p class="text-lg" style="color: var(--text2); text-align: center; max-width: 900px;">
+      Kiến trúc Pipeline từ <strong>Crawler (TripAdvisor, TheMealDB)</strong> &rarr; <strong>Staging DB (MongoDB, MySQL)</strong> &rarr; <strong>ETL Sync</strong> &rarr; <strong>HDFS Storage</strong> &rarr; <strong>Phân tích (Hive, MapReduce)</strong> &rarr; <strong>Dashboard (Streamlit)</strong>.
+    </p>
+  </div>
+</div>
+
+
+<!-- -------------------------- -->
+<!-- ROLE 1: DATA ENGINEER      -->
+<!-- -------------------------- -->
+
+<!-- SLIDE 4: Role 1 Intro -->
+<div class="slide" id="s4">
+  <div class="tag tag-r1">Lê Phạm Thùy Duyên — Role 1</div>
+  <h2 class="grad-blue">Data Engineering &amp; Database</h2>
+  <div class="card" style="margin-top: 32px; display: flex; flex-direction: column; justify-content: center; flex: 1; border-top: 6px solid var(--blue);">
+    <h3 style="font-size: 32px; text-align: center; color: var(--text); margin-bottom: 24px; text-transform: uppercase; letter-spacing: 2px;">Nhiệm vụ trọng tâm</h3>
+    
+    <div class="g2" style="margin-top: 20px; gap: 24px;">
+      <div style="background: rgba(79,142,247,0.1); padding: 24px; border-radius: 12px; border: 1px solid rgba(79,142,247,0.3);">
+        <div style="font-size: 24px; font-weight: 700; color: var(--blue); margin-bottom: 16px;">1. Cào dữ liệu &amp; Vượt rào chống Bot</div>
+        <p class="text-lg" style="color: var(--text2);">Thiết kế hệ thống Scraping thông minh. Nhiệm vụ sống còn là vượt qua các hệ thống Anti-bot (DataDome) cực kỳ phức tạp để lấy được dữ liệu sạch.</p>
+      </div>
+      <div style="background: rgba(34,211,238,0.1); padding: 24px; border-radius: 12px; border: 1px solid rgba(34,211,238,0.3);">
+        <div style="font-size: 24px; font-weight: 700; color: var(--cyan); margin-bottom: 16px;">2. Xử lý Dữ liệu Bẩn (Data Cleaning)</div>
+        <p class="text-lg" style="color: var(--text2);">Làm sạch hàng vạn bình luận text thô, tách địa chỉ, bóc tách điểm số và làm phẳng các mảng dữ liệu lồng nhau phức tạp.</p>
+      </div>
+      <div style="background: rgba(34,197,94,0.1); padding: 24px; border-radius: 12px; border: 1px solid rgba(34,197,94,0.3); grid-column: span 2;">
+        <div style="font-size: 24px; font-weight: 700; color: var(--green); margin-bottom: 16px;">3. Thiết kế Cơ sở dữ liệu (NoSQL &amp; Relational)</div>
+        <p class="text-lg" style="color: var(--text2);">Chuẩn hóa Schema. Đưa dữ liệu thô vào MongoDB (NoSQL) và phân rã các thực thể thành bảng quan hệ tối ưu trong MySQL để chuẩn bị cho Streamlit Dashboard.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 5: 2 Data Sources -->
+<div class="slide" id="s5">
+  <div class="tag tag-r1">Thu thập dữ liệu</div>
+  <h2 class="grad-blue">Giới thiệu 2 Nguồn Dữ liệu</h2>
+  <p class="subtitle">Hệ thống kết hợp dữ liệu từ 2 nền tảng riêng biệt để phục vụ phân tích chéo.</p>
+  
+  <div class="g2" style="margin-top: 40px; flex: 1;">
+    <div class="card" style="border-top: 6px solid var(--green);">
+      <h3 style="margin-bottom: 10px; color: var(--text);">TripAdvisor <span style="font-size: 18px; color: var(--text2); font-weight: 400;">(tripadvisor.com)</span></h3>
+      <p class="text-lg" style="color: var(--text2);">Nền tảng đánh giá du lịch và nhà hàng lớn nhất thế giới.</p>
+      <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border);">
+        <div style="font-weight: 700; color: var(--cyan); margin-bottom: 12px;">Dữ liệu thu thập:</div>
+        <ul style="font-size: 20px; line-height: 1.6; padding-left: 20px; color: var(--text);">
+          <li>Thông tin chi tiết của nhà hàng tại TP.HCM.</li>
+          <li>Chỉ số xếp hạng (rating) và tổng số lượt đánh giá.</li>
+          <li>Nội dung bình luận chi tiết (review) của từng khách hàng.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card" style="border-top: 6px solid var(--amber);">
+      <h3 style="margin-bottom: 10px; color: var(--text);">TheMealDB <span style="font-size: 18px; color: var(--text2); font-weight: 400;">(themealdb.com)</span></h3>
+      <p class="text-lg" style="color: var(--text2);">Cơ sở dữ liệu mở (Open API) về các công thức nấu ăn toàn cầu.</p>
+      <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border);">
+        <div style="font-weight: 700; color: var(--cyan); margin-bottom: 12px;">Dữ liệu thu thập:</div>
+        <ul style="font-size: 20px; line-height: 1.6; padding-left: 20px; color: var(--text);">
+          <li>Danh sách các món ăn quốc tế.</li>
+          <li>Phân loại (ẩm thực Ý, Pháp, Á, Âu...).</li>
+          <li>Danh sách nguyên liệu (ingredients) cấu thành nên món ăn.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 6: TripAdvisor Details -->
+<div class="slide" id="s6">
+  <div class="tag tag-r1">Nguồn 1: TripAdvisor</div>
+  <h2 class="grad-blue">Phân tích Dữ liệu TripAdvisor</h2>
+  <div class="card" style="margin-top: 32px; flex: 1;">
+    <table class="tbl">
+      <thead><tr><th>Trường dữ liệu</th><th>Ý nghĩa / Mục đích phân tích</th></tr></thead>
+      <tbody>
+        <tr><td><strong>URL (ID)</strong></td><td>Định danh duy nhất nhà hàng để chống trùng lặp.</td></tr>
+        <tr><td><strong>Name</strong></td><td>Tên nhà hàng để hiển thị trên Dashboard.</td></tr>
+        <tr><td><strong>Address / District</strong></td><td>Phân tích sự phân bổ nhà hàng theo địa lý (VD: Quận nào có nhiều nhà hàng nhất, điểm trung bình cao nhất).</td></tr>
+        <tr><td><strong>Rating (1-5)</strong></td><td>Phân khúc nhà hàng thành các nhóm: 1-2 sao, 3 sao, 4-5 sao.</td></tr>
+        <tr><td><strong>Review Count</strong></td><td>Đo lường mức độ phổ biến và độ tin cậy của nhà hàng.</td></tr>
+        <tr><td><strong>Reviews (Array)</strong></td><td>Mỗi phần tử chứa [User, Rating, Comment]. Đây là dữ liệu text cốt lõi dùng cho MapReduce Sentiment Analysis (chấm điểm cảm xúc).</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- SLIDE 7: Scraper Selection -->
+<div class="slide" id="s7">
+  <div class="tag tag-r1">Khảo sát công cụ</div>
+  <h2 class="grad-blue">Hành trình chọn Công cụ Crawl</h2>
+  <div class="tl" style="margin-top: 40px;">
+    <div class="tl-item">
+      <div class="tl-icon" style="background:var(--red-dim); color:var(--red);">1</div>
+      <div class="tl-body">
+        <div class="text-lg" style="font-weight: 700; color: var(--red);">Thất bại với HTTP Requests truyền thống</div>
+        <div class="text-lg" style="color: var(--text2); margin-top: 8px;">Sử dụng thư viện `requests`, `curl_cffi` và `scrapy` thuần đều lập tức nhận mã lỗi HTTP 403 Forbidden. TripAdvisor dùng hệ thống DataDome/PerimeterX phát hiện không có trình duyệt thật (không thực thi được JS).</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-icon" style="background:var(--green-dim); color:var(--green);">2</div>
+      <div class="tl-body">
+        <div class="text-lg" style="font-weight: 700; color: var(--green);">Giải pháp: Scrapy kết hợp Playwright</div>
+        <div class="text-lg" style="color: var(--text2); margin-top: 8px;">
+          <ul style="padding-left: 20px; line-height: 1.6;">
+            <li><strong>Scrapy:</strong> Framework thu thập dữ liệu mạnh mẽ, quản lý luồng (concurrency), tự động theo đuổi link (spider), pipelines.</li>
+            <li><strong>Playwright:</strong> Công cụ tự động hóa trình duyệt (Chromium/Firefox/WebKit), render HTML như người dùng thật.</li>
+            <li><strong>Sự kết hợp (scrapy-playwright):</strong> Scrapy điều phối logic lấy link, nhưng giao việc fetch HTML cho Playwright mở trình duyệt giả lập. Trang web tưởng đây là con người, tải toàn bộ React DOM và cấp quyền truy cập.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 8: XPath vs Selector -->
+<div class="slide" id="s8">
+  <div class="tag tag-r1">Trích xuất Dữ liệu</div>
+  <h2 class="grad-blue">Kỹ thuật XPath và CSS Selector</h2>
+  
+  <div class="g2" style="margin-top: 32px; flex: 1; align-items: start;">
+    <div class="card">
+      <h3 style="margin-bottom: 20px; color: var(--cyan);">Phân biệt CSS Selector &amp; XPath</h3>
+      <table class="tbl" style="font-size: 18px;">
+        <tr><td><strong>CSS Selector</strong></td><td>Cú pháp ngắn gọn, dễ đọc, tìm theo id (`#`), class (`.`), tag. Dùng tốt cho layout tĩnh. Không thể duyệt ngược lên cha.</td></tr>
+        <tr><td><strong>XPath</strong></td><td>Cú pháp phức tạp hơn nhưng sức mạnh tuyệt đối. Tìm theo nội dung text, duyệt ngược cây DOM, tìm phần tử theo cấu trúc logic phức tạp.</td></tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom: 20px; color: var(--green);">Áp dụng trong Đồ án</h3>
+      <ul class="checks">
+        <li><strong>Dùng CSS Selector:</strong> Tìm vùng khoanh vùng đánh giá (VD: `div[data-automation="reviewCard"]`). Vì các thẻ này có thuộc tính rõ ràng.</li>
+        <li><strong>Dùng XPath:</strong> Tìm Rating (`//svg/title[contains(text(), "bubbles")]`). TripAdvisor render rating bằng file SVG không có class cố định, bắt buộc phải dùng XPath để tìm chữ "bubbles" ẩn bên trong.</li>
+        <li><strong>Step-by-step:</strong> Bật DevTools (F12) -> Inspect phần tử -> Lấy XPath tương đối -> Test trên console browser -> Đưa vào Scrapy.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 9: MongoDB Setup -->
+<div class="slide" id="s9">
+  <div class="tag tag-r1">Lưu trữ Dữ liệu Thô</div>
+  <h2 class="grad-blue">Cài đặt MongoDB &amp; Upsert Pipeline</h2>
+  <div class="card" style="margin-top: 32px; flex: 1;">
+    <div class="row">
+      <div class="row-icon">🍃</div>
+      <div>
+        <div class="row-label">Tại sao chọn MongoDB?</div>
+        <div class="row-text">Dữ liệu cào về có cấu trúc không đồng nhất (nhà hàng có reviews, nhà hàng không có). MongoDB (NoSQL) lưu trữ dữ liệu dạng JSON/BSON, đặc biệt tốt cho cấu trúc mảng lồng nhau (Nested Array) như danh sách Reviews.</div>
+      </div>
+    </div>
+    
+    <div class="row" style="margin-top: 40px;">
+      <div class="row-icon">⚙️</div>
+      <div>
+        <div class="row-label">Cơ chế Upsert (Update or Insert)</div>
+        <div class="row-text">
+          Scrapy được cấu hình <strong>Item Pipeline</strong> kết nối trực tiếp đến MongoDB.
+          Khi cào được 1 nhà hàng:
+          <ul style="margin-top: 10px; padding-left: 20px; color: var(--text2); font-size: 20px; line-height: 1.6;">
+            <li>Hệ thống lấy URL làm khóa chính `_id`.</li>
+            <li>Kiểm tra trong DB: Nếu URL đã tồn tại -> Cập nhật thông tin mới nhất.</li>
+            <li>Nếu URL chưa có -> Thêm mới bản ghi.</li>
+            <li>Đảm bảo chạy crawler nhiều lần <strong>không bao giờ sinh ra dữ liệu rác/trùng lặp</strong>.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 10: Vấn đề 1 -->
+<div class="slide" id="s10">
+  <div class="tag tag-issue">TripAdvisor · Vấn đề 1 / 6</div>
+  <h2 class="grad-blue">Lỗi kết nối HTTP 403 Forbidden</h2>
+  <div class="g2" style="margin-top: 32px; flex: 1;">
+    <div class="issue">
+      <div class="row-label">Nguyên nhân</div>
+      <div class="row-text muted">Mặc dù đã dùng Playwright Chromium, trình duyệt vẫn bị lộ cờ hiệu `navigator.webdriver = true`. Hệ thống DataDome nhận diện đây là bot tự động và lập tức chặn truy cập (403).</div>
+    </div>
+    <div class="card" style="border-left: 4px solid var(--green);">
+      <div class="row-label">Giải pháp (Stealth Mode)</div>
+      <ul class="checks">
+        <li>Thêm tham số `--disable-blink-features=AutomationControlled` vào Playwright.</li>
+        <li>Cài đặt thư viện `playwright-stealth` để xóa các dấu vết của bot.</li>
+        <li>Cung cấp `USER_AGENT` của trình duyệt Chrome thật trên Windows.</li>
+      </ul>
+      <div style="margin-top: 20px; font-size: 20px; color: var(--green); font-weight: 700;">Kết quả: Qua mặt thành công, nhận mã 200 OK.</div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 11: Vấn đề 2 -->
+<div class="slide" id="s11">
+  <div class="tag tag-issue">TripAdvisor · Vấn đề 2 / 6</div>
+  <h2 class="grad-blue">Vòng lặp vô hạn &amp; Ghi đè Review</h2>
+  <div class="g2" style="margin-top: 32px; flex: 1;">
+    <div class="issue">
+      <div class="row-label">Nguyên nhân</div>
+      <div class="row-text muted">
+        1. Các nhà hàng nổi tiếng có quá nhiều trang đánh giá (200+ trang), bot bị kẹt hàng giờ chỉ ở 1 nhà hàng.<br><br>
+        2. Khi chuyển trang, mảng `reviews = []` bị khởi tạo lại từ đầu, làm mất toàn bộ review của các trang trước đó. Kết quả cuối chỉ còn đúng 15 review của trang cuối cùng.
+      </div>
+    </div>
+    <div class="card" style="border-left: 4px solid var(--green);">
+      <div class="row-label">Giải pháp</div>
+      <ul class="checks">
+        <li>Thiết lập hằng số `MAX_REVIEWS = 75` (tương đương 5 trang) để lấy mẫu đại diện, dừng pagination hợp lý.</li>
+        <li>Truyền dữ liệu qua các trang bằng `response.meta`.</li>
+        <li>Kiểm tra: Nếu đã có dữ liệu từ trang trước, chỉ <strong>Append (thêm vào)</strong> mảng cũ, không khởi tạo lại mảng mới.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 12: Vấn đề 3 -->
+<div class="slide" id="s12">
+  <div class="tag tag-issue">TripAdvisor · Vấn đề 3 / 6</div>
+  <h2 class="grad-blue">Mất địa chỉ (Null Address) khi sang trang</h2>
+  <div class="g2" style="margin-top: 32px; flex: 1;">
+    <div class="issue">
+      <div class="row-label">Nguyên nhân</div>
+      <div class="row-text muted">Trang thông tin chính và các trang review tiếp theo của TripAdvisor có cấu trúc HTML khác nhau. Khi bot chạy lại lệnh XPath tìm địa chỉ trên trang số 2, XPath bị sai, trả về `null` và ghi đè mất địa chỉ đúng đã lấy được ở trang 1.</div>
+    </div>
+    <div class="card" style="border-left: 4px solid var(--green);">
+      <div class="row-label">Giải pháp</div>
+      <ul class="checks">
+        <li>Cấu trúc lại luồng cào dữ liệu: Chỉ thực thi lệnh cào các thông tin chung (Tên, Địa chỉ, Rating tổng) <strong>một lần duy nhất ở trang đầu tiên</strong>.</li>
+        <li>Các trang pagination phía sau chỉ tập trung lấy Review và mượn thông tin chung từ `response.meta`.</li>
+      </ul>
+      <div style="margin-top: 20px; font-size: 20px; color: var(--green); font-weight: 700;">Kết quả: Bảo toàn nguyên vẹn mọi thông tin.</div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 13: Vấn đề 4 -->
+<div class="slide" id="s13">
+  <div class="tag tag-issue">TripAdvisor · Vấn đề 4 / 6</div>
+  <h2 class="grad-blue">CAPTCHA tàng hình (Fake HTTP 200)</h2>
+  <div class="g2" style="margin-top: 32px; flex: 1;">
+    <div class="issue">
+      <div class="row-label">Nguyên nhân</div>
+      <div class="row-text muted">Hệ thống DataDome của web trả về mã thành công `HTTP 200 OK` nhưng nội dung HTML bên trong thực chất là trang yêu cầu giải CAPTCHA. Scrapy bị đánh lừa là trang bình thường, cố gắng chạy XPath và bị lỗi văng script.</div>
+    </div>
+    <div class="card" style="border-left: 4px solid var(--green);">
+      <div class="row-label">Giải pháp</div>
+      <ul class="checks">
+        <li>Cấu hình Playwright chạy chế độ <strong>Headful Browser</strong> (có giao diện thật).</li>
+        <li>Trình duyệt thật tự động thực thi các file JavaScript kiểm tra hành vi ngầm của DataDome.</li>
+        <li>DataDome xác nhận browser hợp lệ, tự cấp Session Cookie mà không hiển thị CAPTCHA. Scrapy mượt mà đi tiếp.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 14: Vấn đề 5 -->
+<div class="slide" id="s14">
+  <div class="tag tag-issue">TripAdvisor · Vấn đề 5 / 6</div>
+  <h2 class="grad-blue">Dữ liệu bẩn (Dirty Data)</h2>
+  <div class="g2" style="margin-top: 32px; flex: 1;">
+    <div class="issue">
+      <div class="row-label">Nguyên nhân</div>
+      <div class="row-text muted">
+        Dữ liệu cào về có dạng text thô, không khớp chuẩn phân tích:<br><br>
+        - Số lượng đánh giá: `"(112)"` (chuỗi text)<br>
+        - Điểm sao: `"5 of 5 bubbles"`<br>
+        - Địa chỉ bị dính Zipcode: `"Ho Chi Minh City 70000"`
+      </div>
+    </div>
+    <div class="card" style="border-left: 4px solid var(--green);">
+      <div class="row-label">Giải pháp (Data Normalization)</div>
+      <ul class="checks">
+        <li>Xây dựng script Python (`init_db.py`) chạy sau bước cào.</li>
+        <li>Dùng Regular Expression trích xuất số: `"(112)"` -> `112` (Integer).</li>
+        <li>Regex lấy điểm: `"5 of 5 bubbles"` -> `5.0` (Float).</li>
+        <li>Xử lý tách chính xác tên "Quận 1", "Quận 3" từ chuỗi địa chỉ dài.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 15: TheMealDB Details -->
+<div class="slide" id="s15">
+  <div class="tag tag-r1">Nguồn 2: TheMealDB</div>
+  <h2 class="grad-blue">Phân tích Dữ liệu TheMealDB</h2>
+  <div class="card" style="margin-top: 32px; flex: 1;">
+    <table class="tbl">
+      <thead><tr><th>Trường dữ liệu</th><th>Ý nghĩa / Mục đích phân tích</th></tr></thead>
+      <tbody>
+        <tr><td><strong>ID (meal_id)</strong></td><td>Mã định danh duy nhất của công thức.</td></tr>
+        <tr><td><strong>Name</strong></td><td>Tên món ăn (VD: Adana kebab, Beef Wellington).</td></tr>
+        <tr><td><strong>Category</strong></td><td>Phân loại món ăn (Seafood, Beef, Vegetarian...) phục vụ thống kê tần suất ẩm thực.</td></tr>
+        <tr><td><strong>Area</strong></td><td>Khu vực ẩm thực (Italian, Vietnamese, Japanese...).</td></tr>
+        <tr><td><strong>Ingredients (Array)</strong></td><td>Mảng chứa danh sách các nguyên liệu làm nên món ăn. Dữ liệu này đóng vai trò <strong>từ điển nguyên liệu</strong> để tìm kiếm chéo trong bình luận của nhà hàng TripAdvisor (Ingredient Match MapReduce).</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- SLIDE 16: TheMealDB Setup -->
+<div class="slide" id="s16">
+  <div class="tag tag-r1">Lưu trữ Dữ liệu Thô</div>
+  <h2 class="grad-blue">Chiến lược hút API &amp; Gộp mảng JSON</h2>
+  <div class="g2" style="margin-top: 32px; flex: 1; align-items: start;">
+    <div class="card">
+      <h3 style="margin-bottom: 20px; color: var(--cyan);">Tối ưu số lần gọi API</h3>
+      <p class="text-lg">Thay vì gọi từng ID món ăn, hệ thống gọi API endpoint `search.php?f={letter}` duyệt từ A đến Z. <strong>Chỉ với 26 requests</strong>, thu thập được toàn bộ ~300+ món ăn miễn phí, không bao giờ vi phạm Rate Limit.</p>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom: 20px; color: var(--green);">Xử lý Schema kỳ lạ của API</h3>
+      <p class="text-lg">API trả về 20 cột riêng biệt: `strIngredient1` đến `strIngredient20`. Điều này cực kỳ khó cho MapReduce.</p>
+      <ul class="checks" style="margin-top: 10px;">
+        <li>Dùng vòng lặp động trong Python gom 20 cột này thành 1 mảng JSON duy nhất: `ingredients: [...]`</li>
+        <li>Loại bỏ các nguyên liệu rỗng hoặc Null.</li>
+        <li>Insert trực tiếp Collection `meals` vào MongoDB.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 17: Vấn đề 6 -->
+<div class="slide" id="s17">
+  <div class="tag tag-issue">TheMealDB · Vấn đề 6 / 6</div>
+  <h2 class="grad-blue">Mất kết nối API mạng giữa chừng</h2>
+  <div class="g2" style="margin-top: 32px; flex: 1;">
+    <div class="issue">
+      <div class="row-label">Nguyên nhân</div>
+      <div class="row-text muted">Quá trình kéo dữ liệu từ TheMealDB API đòi hỏi nhiều vòng lặp HTTP. Nếu mạng chập chờn hoặc API bị giới hạn (Rate limit), script bị sập và làm hỏng luồng chạy tự động của toàn dự án.</div>
+    </div>
+    <div class="card" style="border-left: 4px solid var(--green);">
+      <div class="row-label">Giải pháp (Auto Fallback)</div>
+      <ul class="checks">
+        <li>Tạo thư mục lưu trữ dự phòng (Offline Seed Files).</li>
+        <li>Bọc luồng gọi API bằng khối lệnh `Try / Except`.</li>
+        <li>Nếu gọi API thành công -> Lưu đè lại bản offline mới nhất.</li>
+        <li>Nếu mạng sập (Exception) -> Tự động đọc dữ liệu từ file offline. Đảm bảo MapReduce phía sau luôn có data để chạy.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 18: Thiết kế CSDL MySQL -->
+<div class="slide" id="s18">
+  <div class="tag tag-r1">Cấu trúc Dữ liệu</div>
+  <h2 class="grad-blue">Thiết kế &amp; Chuẩn hóa MySQL Schema</h2>
+  
+  <div class="g2" style="margin-top: 32px; flex: 1; align-items: start;">
+    <div class="card">
+      <h3 style="margin-bottom: 20px; color: var(--cyan);">Tách bảng Relational DB</h3>
+      <p class="text-lg">Dữ liệu thô từ MongoDB (Nested Documents) không phù hợp cho truy vấn Streamlit hay MapReduce phân tích theo chiều dọc. Script `init_db.py` thực hiện phân rã thành các bảng chuẩn:</p>
+      <ul class="checks" style="margin-top: 16px; font-size: 18px;">
+        <li><strong>Bảng `restaurants`:</strong> `id` (PK), `name`, `rating`, `review_count`, `district_parsed`, `city`.</li>
+        <li><strong>Bảng `reviews`:</strong> `id` (PK), `restaurant_id` (FK), `user`, `rating`, `comment`. Hơn 44,000 dòng.</li>
+        <li><strong>Bảng `meals`:</strong> `id` (PK), `name`, `category`, `area`, `ingredients` (dạng text).</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom: 20px; color: var(--green);">Cấu hình MySQL &amp; Tối ưu</h3>
+      <ul class="checks" style="font-size: 18px;">
+        <li>Cấu hình MySQL tự động chạy ngầm trên Ubuntu WSL2.</li>
+        <li>Tạo Dedicated Database `food_sentiment_db`.</li>
+        <li>Sử dụng cấu trúc Khóa chính (Primary Key) và Khóa ngoại (Foreign Key) đảm bảo tính toàn vẹn dữ liệu.</li>
+        <li>Các thao tác Thêm, Xóa, Sửa (CRUD) từ giao diện Streamlit sẽ phản hồi trực tiếp lên Schema MySQL này một cách chuẩn xác.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 19: Summary Role 1 -->
+<div class="slide" id="s19">
+  <div class="tag tag-r1">Tổng kết Role 1</div>
+  <h2 class="grad-blue">Thành quả của Data Engineering</h2>
+  
+  <div class="g2" style="margin-top: 40px; flex: 1;">
+    <div class="card" style="border-color: var(--blue);">
+      <h3 style="margin-bottom: 20px; color: var(--text);">Dữ liệu thu thập được</h3>
+      <ul class="checks">
+        <li><strong>1,334</strong> nhà hàng tại TP.HCM.</li>
+        <li><strong>~44,000</strong> đánh giá chi tiết (giới hạn 75 review/nhà hàng).</li>
+        <li><strong>666</strong> món ăn quốc tế làm từ điển tham chiếu.</li>
+      </ul>
+    </div>
+
+    <div class="card" style="border-color: var(--green);">
+      <h3 style="margin-bottom: 20px; color: var(--text);">Hạ tầng sẵn sàng</h3>
+      <ul class="checks">
+        <li>Vượt qua hệ thống Anti-bot DataDome bằng Playwright.</li>
+        <li>Làm sạch, chuẩn hóa (Normalization) dữ liệu nhiễu.</li>
+        <li>Upsert an toàn vào MongoDB và rã bảng chuẩn hóa lên MySQL.</li>
+        <li>Sẵn sàng đẩy dữ liệu thô/sạch lên HDFS cho MapReduce.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- -------------------------- -->
+<!-- ROLE 2: HADOOP INFRA       -->
+<!-- -------------------------- -->
+
+<!-- SLIDE 20: Role 2 Intro -->
+<div class="slide" id="s20">
+  <div class="tag tag-r2">Trần Đại Sơn — Role 2</div>
+  <h2 class="grad-purple">Hadoop Infrastructure &amp; Data Sync</h2>
+  <div class="card" style="margin-top: 32px; display: flex; flex-direction: column; justify-content: center; flex: 1; border-top: 6px solid var(--purple);">
+    <h3 style="font-size: 32px; text-align: center; color: var(--text); margin-bottom: 24px; text-transform: uppercase; letter-spacing: 2px;">Cầu nối OLTP &amp; OLAP</h3>
+    
+    <div class="g2" style="margin-top: 20px; gap: 24px;">
+      <div style="background: rgba(155,110,243,0.1); padding: 24px; border-radius: 12px; border: 1px solid rgba(155,110,243,0.3);">
+        <div style="font-size: 24px; font-weight: 700; color: var(--purple); margin-bottom: 16px;">1. Đồng bộ lên HDFS</div>
+        <p class="text-lg" style="color: var(--text2);">Trích xuất toàn bộ dữ liệu từ MongoDB &amp; MySQL thành các file phân tán JSONL, tự động upload lên Hệ thống lưu trữ Hadoop (HDFS) an toàn.</p>
+      </div>
+      <div style="background: rgba(155,110,243,0.1); padding: 24px; border-radius: 12px; border: 1px solid rgba(155,110,243,0.3);">
+        <div style="font-size: 24px; font-weight: 700; color: var(--purple); margin-bottom: 16px;">2. Xây dựng Data Warehouse</div>
+        <p class="text-lg" style="color: var(--text2);">Sử dụng Apache Hive mapping dữ liệu thô trên HDFS thành các External Tables. Chuyển đổi dữ liệu NoSQL phức tạp (Nested Arrays) sang bảng SQL dễ truy vấn.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 21: Data Ingestion Pipeline -->
+<div class="slide" id="s21">
+  <div class="tag tag-r2">Data Ingestion</div>
+  <h2 class="grad-purple">Luồng đồng bộ dữ liệu (MySQL / MongoDB → HDFS)</h2>
+  
+  <div class="g2" style="margin-top: 32px; flex: 1;">
+    <div class="card">
+      <h3 style="margin-bottom: 20px; color: var(--text);">Thách thức của Dữ liệu thô</h3>
+      <ul class="checks">
+        <li>Cơ sở dữ liệu trung gian (Staging DB) không thích hợp để MapReduce phân tích trực tiếp.</li>
+        <li>Hadoop cần dữ liệu dạng file văn bản phẳng trên hệ thống HDFS để chia nhỏ (split) và xử lý song song.</li>
+      </ul>
+    </div>
+
+    <div class="card" style="border-left: 4px solid var(--purple);">
+      <h3 style="margin-bottom: 20px; color: var(--purple);">Giải pháp: JSONL Format</h3>
+      <ul class="checks">
+        <li>Viết 2 script Python (`mongo_to_hdfs.py`, `mysql_to_hdfs.py`) đóng vai trò là ETL.</li>
+        <li>Convert toàn bộ các Table/Collection sang định dạng **JSON Lines (JSONL)**. Mỗi dòng là 1 object JSON hợp lệ độc lập.</li>
+        <li>Đẩy thẳng lên directory `/data/raw/` của HDFS với Replication Factor=3.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 22: Hive Schema -->
+<div class="slide" id="s22">
+  <div class="tag tag-r2">Data Warehouse</div>
+  <h2 class="grad-purple">Khởi tạo Apache Hive Schema &amp; Views</h2>
+  <div class="card" style="margin-top: 32px; flex: 1;">
+    <table class="tbl">
+      <thead><tr><th>Hành động</th><th>Mục đích</th></tr></thead>
+      <tbody>
+        <tr><td><strong>External Tables</strong></td><td>Tạo bảng Hive (SQL) ánh xạ trực tiếp đến các thư mục `/data/raw/` trên HDFS. Sử dụng `JsonSerDe` để Hive tự hiểu cấu trúc JSON. Không di chuyển dữ liệu gốc.</td></tr>
+        <tr><td><strong>STRUCT &amp; ARRAY</strong></td><td>Hive hỗ trợ ánh xạ cấu trúc phức tạp (như danh sách reviews lồng nhau của MongoDB) thành kiểu `ARRAY<STRUCT<user, rating, comment>>`.</td></tr>
+        <tr><td><strong>Analytics Views</strong></td><td>Tạo sẵn 6 SQL Views lưu trữ logic phân tích (Ví dụ: `view_rating_by_district`). Các views này cung cấp dữ liệu tức thì cho Frontend Streamlit mà không cần viết lại Query.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- SLIDE 23: Role 2 Issue 1 -->
+<div class="slide" id="s23">
+  <div class="tag tag-issue">Hadoop · Vấn đề 1 / 6</div>
+  <h2 class="grad-purple">Lỗi không thể đồng bộ Decimal MySQL</h2>
+  <div class="g2" style="margin-top: 32px; flex: 1;">
+    <div class="issue">
+      <div class="row-label">Nguyên nhân</div>
+      <div class="row-text muted">Script đẩy MySQL sang HDFS bị sập lỗi `TypeError: Object of type Decimal is not JSON serializable`. Module JSON mặc định của Python không hiểu được kiểu dữ liệu thập phân (`Decimal`) của MySQL.</div>
+    </div>
+    <div class="card" style="border-left: 4px solid var(--green);">
+      <div class="row-label">Giải pháp</div>
+      <ul class="checks">
+        <li>Viết đè (Override) một lớp `MySQLJSONEncoder` tùy chỉnh trong Python kế thừa từ `json.JSONEncoder`.</li>
+        <li>Xử lý ngoại lệ: Nếu gặp kiểu `Decimal`, ép kiểu thủ công về `float` trước khi parse thành JSON. Script chạy mượt mà.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 24: Role 2 Issue 2 -->
+<div class="slide" id="s24">
+  <div class="tag tag-issue">Hadoop · Vấn đề 2 / 6</div>
+  <h2 class="grad-purple">Lỗi mã hóa ObjectId MongoDB</h2>
+  <div class="g2" style="margin-top: 32px; flex: 1;">
+    <div class="issue">
+      <div class="row-label">Nguyên nhân</div>
+      <div class="row-text muted">Tương tự MySQL, trường `_id` của MongoDB sử dụng định dạng nhị phân nội bộ là `ObjectId`. Hive và JSON chuẩn hoàn toàn không thể biên dịch và đọc được loại dữ liệu nhị phân nguyên thủy này.</div>
+    </div>
+    <div class="card" style="border-left: 4px solid var(--green);">
+      <div class="row-label">Giải pháp</div>
+      <ul class="checks">
+        <li>Tạo `MongoJSONEncoder` để chuyển đổi `ObjectId` thành một chuỗi `String` bình thường (`str(o)`).</li>
+        <li>Cấu trúc lại khóa: Chuyển tên khóa `_id` của MongoDB thành `id` thông thường để Hive ánh xạ tên cột dễ dàng hơn.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 25: Role 2 Issue 3 -->
+<div class="slide" id="s25">
+  <div class="tag tag-issue">Hadoop · Vấn đề 3 / 6</div>
+  <h2 class="grad-purple">HDFS Directory Already Exists</h2>
+  <div class="g2" style="margin-top: 32px; flex: 1;">
+    <div class="issue">
+      <div class="row-label">Nguyên nhân</div>
+      <div class="row-text muted">Hadoop HDFS được thiết kế để bảo vệ dữ liệu. Lệnh `hdfs dfs -put` sẽ báo lỗi và từ chối chạy nếu thư mục hoặc file đích đã tồn tại trên HDFS từ các lần chạy trước, gây cản trở việc tự động hóa.</div>
+    </div>
+    <div class="card" style="border-left: 4px solid var(--green);">
+      <div class="row-label">Giải pháp</div>
+      <ul class="checks">
+        <li>Bổ sung tham số `-f` (Force) vào lệnh put: `hdfs dfs -put -f <local> <hdfs>`.</li>
+        <li>Tham số này yêu cầu Hadoop tự động ghi đè dữ liệu cũ bằng dữ liệu mới mà không hiển thị lỗi. Pipeline trở nên tự động hoàn toàn (idempotent).</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 26: Role 2 Issue 4 -->
+<div class="slide" id="s26">
+  <div class="tag tag-issue">Hadoop · Vấn đề 4 / 6</div>
+  <h2 class="grad-purple">Lỗi Location không tìm thấy của Hive</h2>
+  <div class="g2" style="margin-top: 32px; flex: 1;">
+    <div class="issue">
+      <div class="row-label">Nguyên nhân</div>
+      <div class="row-text muted">Khi tạo External Table trong Hive và chỉ định `LOCATION '/data/raw/restaurants/restaurants.jsonl'`, Hive báo lỗi không tìm thấy dữ liệu. Mặc dù file đã tồn tại trên HDFS.</div>
+    </div>
+    <div class="card" style="border-left: 4px solid var(--green);">
+      <div class="row-label">Giải pháp</div>
+      <ul class="checks">
+        <li>Cơ chế của Hive là <strong>quét thư mục (Directory)</strong> chứ không ánh xạ trực tiếp đến một file cụ thể.</li>
+        <li>Thay đổi câu lệnh thành `LOCATION '/data/raw/restaurants/'`. Hive sẽ tự động scan và đọc tất cả các file JSONL nằm trong thư mục đó.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 27: Role 2 Issue 5 -->
+<div class="slide" id="s27">
+  <div class="tag tag-issue">Hadoop · Vấn đề 5 / 6</div>
+  <h2 class="grad-purple">HiveServer2 Connection Timeout</h2>
+  <div class="g2" style="margin-top: 32px; flex: 1;">
+    <div class="issue">
+      <div class="row-label">Nguyên nhân</div>
+      <div class="row-text muted">Frontend Streamlit không thể truy vấn Hive từ xa. Nhận được lỗi `Connection refused: 10000`. Nguyên nhân là Daemon quản lý kết nối (HiveServer2) chưa được khởi động cùng Hadoop.</div>
+    </div>
+    <div class="card" style="border-left: 4px solid var(--green);">
+      <div class="row-label">Giải pháp</div>
+      <ul class="checks">
+        <li>Đưa lệnh khởi động `hiveserver2` thành Background Process (`nohup`) vào trong file chạy tổng `run.sh`.</li>
+        <li>Tích hợp `set hive.exec.mode.local.auto=true` vào các kết nối JDBC giúp HiveServer xử lý các truy vấn nhỏ nhanh hơn gấp nhiều lần mà không bị Overhead của YARN.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 28: Role 2 Issue 6 -->
+<div class="slide" id="s28">
+  <div class="tag tag-issue">Hadoop · Vấn đề 6 / 6</div>
+  <h2 class="grad-purple">Parse Mảng Dữ Liệu Lồng Nhau (Nested Arrays)</h2>
+  <div class="g2" style="margin-top: 32px; flex: 1;">
+    <div class="issue">
+      <div class="row-label">Nguyên nhân</div>
+      <div class="row-text muted">Một nhà hàng có danh sách rất nhiều Review chứa bên trong (User, Rating, Comment). Hive Query thông thường `SELECT reviews FROM...` trả về chuỗi vô định dạng hoặc báo NULL vì không hiểu được mảng đối tượng.</div>
+    </div>
+    <div class="card" style="border-left: 4px solid var(--green);">
+      <div class="row-label">Giải pháp</div>
+      <ul class="checks">
+        <li>Sử dụng cấu trúc dữ liệu bậc cao của Hive: Khai báo cột reviews là `ARRAY<STRUCT<...>>` trong câu lệnh CREATE TABLE.</li>
+        <li>Sau đó, sử dụng hàm `LATERAL VIEW EXPLODE(reviews)` trong HiveQL để "làm phẳng" (flatten) mảng này. Mỗi Review biến thành 1 dòng phân tích riêng biệt, MapReduce có thể đọc dễ dàng.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 29: Summary Role 2 -->
+<div class="slide" id="s29">
+  <div class="tag tag-r2">Tổng kết Role 2</div>
+  <h2 class="grad-purple">Thành quả của Hadoop Infrastructure</h2>
+  <div class="g2" style="margin-top: 40px; flex: 1;">
+    <div class="card" style="border-color: var(--purple);">
+      <h3 style="margin-bottom: 20px; color: var(--text);">Hệ thống lưu trữ</h3>
+      <ul class="checks">
+        <li>Đồng bộ thành công ~50,000 dòng dữ liệu vào Hadoop HDFS.</li>
+        <li>Thiết lập Replication Factor an toàn.</li>
+        <li>HDFS Structure được tổ chức bài bản cho từng Dataset.</li>
+      </ul>
+    </div>
+    <div class="card" style="border-color: var(--green);">
+      <h3 style="margin-bottom: 20px; color: var(--text);">Kiến trúc Truy vấn (Data Warehouse)</h3>
+      <ul class="checks">
+        <li>Cấu hình thành công Hive Metastore và HiveServer2.</li>
+        <li>Xây dựng xong các External Tables (JsonSerDe).</li>
+        <li>Đóng gói 6 Analytics Views cung cấp data siêu tốc cho Frontend mà không cần code lại logic SQL.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- -------------------------- -->
+<!-- ROLE 3: MAPREDUCE          -->
+<!-- -------------------------- -->
+
+<!-- SLIDE 30: Role 3 Intro -->
+<div class="slide" id="s30">
+  <div class="tag tag-r3">Vũ Kiều Thuý Vân — Role 3</div>
+  <h2 class="grad-cyan">MapReduce Developer</h2>
+  <div class="card" style="margin-top: 32px; display: flex; flex-direction: column; justify-content: center; flex: 1; border-top: 6px solid var(--cyan);">
+    <h3 style="font-size: 32px; text-align: center; color: var(--text); margin-bottom: 24px; text-transform: uppercase; letter-spacing: 2px;">Trái tim Phân tích Dữ liệu</h3>
+    
+    <div class="g2" style="margin-top: 20px; gap: 24px;">
+      <div style="background: rgba(34,211,238,0.1); padding: 24px; border-radius: 12px; border: 1px solid rgba(34,211,238,0.3); grid-column: span 2;">
+        <div style="font-size: 24px; font-weight: 700; color: var(--cyan); margin-bottom: 16px;">Tính toán Song song &amp; Phân tán</div>
+        <p class="text-lg" style="color: var(--text2);">Sử dụng thư viện <code>mrjob</code> của Python chạy trực tiếp trên lõi Hadoop Streaming. Chịu trách nhiệm thiết kế 8 thuật toán MapReduce độc lập để bóc tách, đếm từ, trích xuất nguyên liệu, phân tích cảm xúc (Sentiment) từ hàng vạn bình luận văn bản tự do.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 31: 8 MapReduce Jobs -->
+<div class="slide" id="s31">
+  <div class="tag tag-r3">Thuật toán Phân tích</div>
+  <h2 class="grad-cyan">Tổng quan 8 Thuật toán MapReduce</h2>
+  <div class="card" style="margin-top: 20px; flex: 1; padding: 24px;">
+    <table class="tbl" style="font-size: 16px;">
+      <thead><tr><th>Job Name</th><th>Mục đích Phân tích</th><th>Đầu ra (Output)</th></tr></thead>
+      <tbody>
+        <tr><td><strong>1. Cuisine Count</strong></td><td>Đếm tần suất loại ẩm thực từ TheMealDB</td><td>category/area → count</td></tr>
+        <tr><td><strong>2. Rating by District</strong></td><td>Tính trung bình số điểm của nhà hàng theo từng quận</td><td>district → avg_rating</td></tr>
+        <tr><td><strong>3. Rating Bucket</strong></td><td>Gom nhóm nhà hàng theo 3 bậc: 1-2 sao, 3 sao, 4-5 sao</td><td>bucket → count</td></tr>
+        <tr><td><strong>4. Sentiment Analysis</strong></td><td>Chấm điểm cảm xúc (Positive/Negative) của hàng ngàn review</td><td>restaurant → sentiment_score</td></tr>
+        <tr><td><strong>5. Ingredient Match</strong></td><td>Tìm tên nguyên liệu món ăn (TheMealDB) trong review người dùng</td><td>ingredient → count</td></tr>
+        <tr><td><strong>6. Delivery Analysis</strong></td><td>So sánh Rating giữa nhà hàng có Delivery vs Chỉ ăn tại chỗ</td><td>service_type → avg_rating</td></tr>
+        <tr><td><strong>7. Review Distribution</strong></td><td>Thống kê toàn bộ số sao mà người dùng đã chấm</td><td>stars → count</td></tr>
+        <tr><td><strong>8. Top Reviewed</strong></td><td>Lọc ra Top 10 nhà hàng có số lượng đánh giá cao nhất HCMC</td><td>restaurant → review_count</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- SLIDE 32: Workflow -->
+<div class="slide" id="s32">
+  <div class="tag tag-r3">Cơ chế Hoạt động</div>
+  <h2 class="grad-cyan">Workflow của một MapReduce Job</h2>
+  <div class="card" style="margin-top: 32px; flex: 1; text-align: center; display: flex; flex-direction: column; justify-content: center;">
+    
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 20px;">
+      <div style="flex: 1; padding: 20px; background: var(--surface2); border: 1px solid var(--border); border-radius: 12px;">
+        <h4 style="color: var(--cyan); margin-bottom: 10px;">1. HDFS Input</h4>
+        <p style="color: var(--text2); font-size: 16px;">Đọc từng dòng JSONL từ <code>/data/raw/</code></p>
+      </div>
+      <div style="font-size: 32px; color: var(--text3);">→</div>
+      <div style="flex: 1; padding: 20px; background: rgba(34,211,238,0.1); border: 1px solid var(--cyan); border-radius: 12px;">
+        <h4 style="color: var(--text); margin-bottom: 10px;">2. MAPPER</h4>
+        <p style="color: var(--text2); font-size: 16px;">Parse JSON, trích xuất text/số, sinh ra cặp <code>(Key, Value)</code></p>
+      </div>
+      <div style="font-size: 32px; color: var(--text3);">→</div>
+      <div style="flex: 1; padding: 20px; background: rgba(34,197,94,0.1); border: 1px solid var(--green); border-radius: 12px;">
+        <h4 style="color: var(--text); margin-bottom: 10px;">3. REDUCER</h4>
+        <p style="color: var(--text2); font-size: 16px;">Gom nhóm theo Key, tính tổng/trung bình (Aggregation)</p>
+      </div>
+      <div style="font-size: 32px; color: var(--text3);">→</div>
+      <div style="flex: 1; padding: 20px; background: var(--surface2); border: 1px solid var(--border); border-radius: 12px;">
+        <h4 style="color: var(--cyan); margin-bottom: 10px;">4. HDFS Output</h4>
+        <p style="color: var(--text2); font-size: 16px;">Lưu file kết quả về <code>/data/output/</code></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 33: Role 3 Issue 1 -->
+<div class="slide" id="s33">
+  <div class="tag tag-issue">MapReduce · Vấn đề 1 / 6</div>
+  <h2 class="grad-cyan">Crash do lỗi định dạng JSON</h2>
+  <div class="g2" style="margin-top: 32px; flex: 1;">
+    <div class="issue">
+      <div class="row-label">Nguyên nhân</div>
+      <div class="row-text muted">Bất kỳ dòng text nào bị sai lệch định dạng (dấu nháy hỏng, ký tự UTF-8 không hợp lệ) từ HDFS đều khiến quá trình `json.loads(line)` của hàm Mapper bị văng lỗi (JSONDecodeError), làm sập toàn bộ Job Hadoop đang chạy.</div>
+    </div>
+    <div class="card" style="border-left: 4px solid var(--green);">
+      <div class="row-label">Giải pháp</div>
+      <ul class="checks">
+        <li>Triển khai cơ chế bẫy lỗi <code>try...except (ValueError, JSONDecodeError)</code> xung quanh khối parse.</li>
+        <li>Hadoop tự động bỏ qua (skip silently) dòng dữ liệu rác đó và tiếp tục phân tích hàng vạn dòng hợp lệ còn lại mà không bị gián đoạn.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 34: Role 3 Issue 2 -->
+<div class="slide" id="s34">
+  <div class="tag tag-issue">MapReduce · Vấn đề 2 / 6</div>
+  <h2 class="grad-cyan">Treo RAM do Regex (Ingredient Match)</h2>
+  <div class="g2" style="margin-top: 32px; flex: 1;">
+    <div class="issue">
+      <div class="row-label">Nguyên nhân</div>
+      <div class="row-text muted">Thuật toán dò tìm 300+ tên nguyên liệu trong nội dung văn bản. Nếu biên dịch Regex 1 cách ngây ngô, Engine Regex sẽ bị bùng nổ không gian trạng thái (State Explosion). Hậu quả: MapReduce bị treo, tràn RAM (OOM).</div>
+    </div>
+    <div class="card" style="border-left: 4px solid var(--green);">
+      <div class="row-label">Giải pháp</div>
+      <ul class="checks">
+        <li>Sử dụng hàm <code>mapper_init()</code> để biên dịch (Compile) regex pattern đúng 1 lần duy nhất lúc khởi động Node.</li>
+        <li>Sắp xếp danh sách 300 từ khóa theo chiều dài giảm dần (Length DESC), giúp Regex ưu tiên cụm từ dài trước, tối ưu tốc độ vượt bậc.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 35: Role 3 Issue 3 -->
+<div class="slide" id="s35">
+  <div class="tag tag-issue">MapReduce · Vấn đề 3 / 6</div>
+  <h2 class="grad-cyan">Lỗi sai số thập phân (Floating Point)</h2>
+  <div class="g2" style="margin-top: 32px; flex: 1;">
+    <div class="issue">
+      <div class="row-label">Nguyên nhân</div>
+      <div class="row-text muted">Tính trung bình Rating (Average) trên Python sinh ra các số vô hạn như `4.3450000001`. Khi cộng dồn qua nhiều node phân tán, hệ thống gặp sai số Rounding Error. Kết quả khác với truy vấn SQL của Hive.</div>
+    </div>
+    <div class="card" style="border-left: 4px solid var(--green);">
+      <div class="row-label">Giải pháp</div>
+      <ul class="checks">
+        <li>Can thiệp thẳng vào hàm Reducer cuối cùng.</li>
+        <li>Sau khi tổng hợp, áp dụng hàm `round(avg, 2)` ép chuẩn kết quả về 2 chữ số thập phân trước khi xuất ra output JSON. Đảm bảo 100% khớp với Hive.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 36: Role 3 Issue 4 -->
+<div class="slide" id="s36">
+  <div class="tag tag-issue">MapReduce · Vấn đề 4 / 6</div>
+  <h2 class="grad-cyan">Lệch điểm Sentiment Analysis</h2>
+  <div class="g2" style="margin-top: 32px; flex: 1;">
+    <div class="issue">
+      <div class="row-label">Nguyên nhân</div>
+      <div class="row-text muted">Khách hàng viết review bằng cả chữ hoa, chữ thường, hoặc viết HOA toàn bộ (ví dụ: "GOOD", "good", "GoOd"). Nhưng từ điển phân tích từ tích cực (Lexicon) chỉ có chữ thường. Việc so khớp bị trượt, làm điểm số bị thấp hơn thực tế.</div>
+    </div>
+    <div class="card" style="border-left: 4px solid var(--green);">
+      <div class="row-label">Giải pháp</div>
+      <ul class="checks">
+        <li>Chuyển toàn bộ chuỗi Review về chữ thường `.lower()` TRƯỚC KHI cắt chữ (Tokenize) và đưa vào vòng lặp so sánh.</li>
+        <li>Việc Case-Insensitive Matching giúp MapReduce bắt được chính xác 100% mọi từ khóa tích cực/tiêu cực.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 37: Role 3 Issue 5 -->
+<div class="slide" id="s37">
+  <div class="tag tag-issue">MapReduce · Vấn đề 5 / 6</div>
+  <h2 class="grad-cyan">Lỗi HDFS FileAlreadyExists</h2>
+  <div class="g2" style="margin-top: 32px; flex: 1;">
+    <div class="issue">
+      <div class="row-label">Nguyên nhân</div>
+      <div class="row-text muted">Đặc thù của MapReduce là thư mục Output không được phép tồn tại sẵn. Nếu chạy lại Job lần thứ 2, Hadoop sẽ sập với lỗi thư mục Output đã tồn tại. Ngăn cản quá trình tái phân tích dữ liệu.</div>
+    </div>
+    <div class="card" style="border-left: 4px solid var(--green);">
+      <div class="row-label">Giải pháp</div>
+      <ul class="checks">
+        <li>Viết script Python Runner (`run_all_jobs.py`) bao bọc lại các job.</li>
+        <li>Tự động thực thi lệnh `hdfs dfs -rm -r -f /data/output/...` để xóa bỏ hoàn toàn thư mục rác cũ trước khi submit một job mới lên YARN.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 38: Role 3 Issue 6 -->
+<div class="slide" id="s38">
+  <div class="tag tag-issue">MapReduce · Vấn đề 6 / 6</div>
+  <h2 class="grad-cyan">Container Memory Limit Exceeded</h2>
+  <div class="g2" style="margin-top: 32px; flex: 1;">
+    <div class="issue">
+      <div class="row-label">Nguyên nhân</div>
+      <div class="row-text muted">Nếu hàm Reducer dùng biến mảng <code>all_values = list(values)</code> để gom hết hàng triệu con số vào RAM rồi mới tính trung bình, máy ảo phân tán (Container) sẽ bị YARN tiêu diệt do vi phạm bộ nhớ.</div>
+    </div>
+    <div class="card" style="border-left: 4px solid var(--green);">
+      <div class="row-label">Giải pháp (Data Streaming)</div>
+      <ul class="checks">
+        <li>Thay vì nạp hết vào RAM (Accumulate), thực hiện vòng lặp đọc và cộng dồn ngay lập tức từng luồng dữ liệu (Stream).</li>
+        <li><code>for val in values: total += val</code>. Phương pháp này tiêu thụ Memory cực thấp và duy trì ổn định không giới hạn số dòng.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 39: Summary Role 3 -->
+<div class="slide" id="s39">
+  <div class="tag tag-r3">Tổng kết Role 3</div>
+  <h2 class="grad-cyan">Thành quả của MapReduce Developer</h2>
+  <div class="g2" style="margin-top: 40px; flex: 1;">
+    <div class="card" style="border-color: var(--cyan);">
+      <h3 style="margin-bottom: 20px; color: var(--text);">Hiệu năng Xử lý</h3>
+      <ul class="checks">
+        <li>Hoàn thành và test thành công 8 Job phân tích phức tạp.</li>
+        <li>Job có khả năng chịu tải tốt, bỏ qua dữ liệu bẩn và tối ưu hóa bộ nhớ OOM.</li>
+      </ul>
+    </div>
+    <div class="card" style="border-color: var(--green);">
+      <h3 style="margin-bottom: 20px; color: var(--text);">Kết quả Kinh doanh</h3>
+      <ul class="checks">
+        <li>Cung cấp bộ dữ liệu Data Mining chất lượng cao (Sentiment Score, Phân phối Sao, Trích xuất nguyên liệu...)</li>
+        <li>Các kết quả xuất ra dạng text rõ ràng trên HDFS đã sẵn sàng cho UI vẽ Chart.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+
+<!-- -------------------------- -->
+<!-- ROLE 4: UI DEVELOPER       -->
+<!-- -------------------------- -->
+
+<!-- SLIDE 40: Role 4 Intro -->
+<div class="slide" id="s40">
+  <div class="tag tag-r4">Đinh Trọng Đức Anh — Role 4</div>
+  <h2 class="grad-amber">UI Developer &amp; Data Visualization</h2>
+  <div class="card" style="margin-top: 32px; display: flex; flex-direction: column; justify-content: center; flex: 1; border-top: 6px solid var(--amber);">
+    <h3 style="font-size: 32px; text-align: center; color: var(--text); margin-bottom: 24px; text-transform: uppercase; letter-spacing: 2px;">Tương tác và Trực quan hóa</h3>
+    
+    <div class="g2" style="margin-top: 20px; gap: 24px;">
+      <div style="background: rgba(245,158,11,0.1); padding: 24px; border-radius: 12px; border: 1px solid rgba(245,158,11,0.3);">
+        <div style="font-size: 24px; font-weight: 700; color: var(--amber); margin-bottom: 16px;">1. Giao diện Quản trị CRUD</div>
+        <p class="text-lg" style="color: var(--text2);">Thiết kế Streamlit App cho phép tác nghiệp: Xem danh sách, Thêm mới, Sửa, Xóa nhà hàng theo thời gian thực tác động trực tiếp vào MySQL.</p>
+      </div>
+      <div style="background: rgba(245,158,11,0.1); padding: 24px; border-radius: 12px; border: 1px solid rgba(245,158,11,0.3);">
+        <div style="font-size: 24px; font-weight: 700; color: var(--amber); margin-bottom: 16px;">2. Analytics Dashboard</div>
+        <p class="text-lg" style="color: var(--text2);">Kéo dữ liệu từ Hadoop (qua Apache Hive và MapReduce) và vẽ lên các biểu đồ động Plotly (Bar, Pie, Line) trực quan, có thể tương tác.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 41: Architecture -->
+<div class="slide" id="s41">
+  <div class="tag tag-r4">Kiến trúc UI</div>
+  <h2 class="grad-amber">Kiến trúc của Ứng dụng Streamlit</h2>
+  
+  <div class="g2" style="margin-top: 32px; flex: 1; align-items: start;">
+    <div class="card">
+      <h3 style="margin-bottom: 20px; color: var(--cyan);">Page 1: Data Management</h3>
+      <table class="tbl" style="font-size: 16px;">
+        <tr><td><strong>Database</strong></td><td>MySQL (Transactional Real-time)</td></tr>
+        <tr><td><strong>Giao thức</strong></td><td>mysql.connector (Thực thi Queries)</td></tr>
+        <tr><td><strong>Chức năng chính</strong></td><td>
+          - Tab Read: Tìm kiếm theo tên/quận.<br>
+          - Tab Insert: Form nhập thông tin.<br>
+          - Tab Delete: Xóa dựa trên ID.
+        </td></tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom: 20px; color: var(--green);">Page 2: Big Data Reports</h3>
+      <table class="tbl" style="font-size: 16px;">
+        <tr><td><strong>Database</strong></td><td>Apache Hive (OLAP)</td></tr>
+        <tr><td><strong>Giao thức</strong></td><td>PyHive Connection (Port 10000)</td></tr>
+        <tr><td><strong>Chức năng chính</strong></td><td>
+          - Nạp Batch 6 Hive Views.<br>
+          - Caching dữ liệu bằng `session_state`.<br>
+          - Render 6 Biểu đồ Plotly Express.
+        </td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 42: Visualizations -->
+<div class="slide" id="s42">
+  <div class="tag tag-r4">Biểu đồ (Charts)</div>
+  <h2 class="grad-amber">6 Biểu đồ Trực quan Chính</h2>
+  <div class="card" style="margin-top: 20px; flex: 1;">
+    <table class="tbl" style="font-size: 18px;">
+      <thead><tr><th>Tên Biểu đồ</th><th>Loại Biểu đồ</th><th>Dữ liệu nguồn</th></tr></thead>
+      <tbody>
+        <tr><td><strong>1. Top Districts by Rating</strong></td><td>Horizontal Bar</td><td>Hive View (`view_rating_by_district`)</td></tr>
+        <tr><td><strong>2. Cuisine Distribution</strong></td><td>Donut / Pie</td><td>Hive View (`view_cuisine_frequency`)</td></tr>
+        <tr><td><strong>3. Rating Classification</strong></td><td>Vertical Bar</td><td>Hive View (`view_rating_histogram`)</td></tr>
+        <tr><td><strong>4. Top Districts by Count</strong></td><td>Horizontal Bar</td><td>Hive View (`view_top_districts`)</td></tr>
+        <tr><td><strong>5. Review Star Trend</strong></td><td>Line Chart</td><td>MapReduce Output (`mr_review_distribution`)</td></tr>
+        <tr><td><strong>6. Delivery vs Dine-in</strong></td><td>Grouped Bar</td><td>MapReduce Output (`mr_delivery_analysis`)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- SLIDE 43: Role 4 Issue 1 -->
+<div class="slide" id="s43">
+  <div class="tag tag-issue">UI/UX · Vấn đề 1 / 6</div>
+  <h2 class="grad-amber">Lỗi từ chối kết nối MySQL (WSL2)</h2>
+  <div class="g2" style="margin-top: 32px; flex: 1;">
+    <div class="issue">
+      <div class="row-label">Nguyên nhân</div>
+      <div class="row-text muted">Môi trường giả lập WSL2 và Windows Host có lớp mạng riêng biệt. Khi kết nối MySQL với tham số Host là `localhost`, Streamlit bị bối rối và sinh ra lỗi `Connection refused`.</div>
+    </div>
+    <div class="card" style="border-left: 4px solid var(--green);">
+      <div class="row-label">Giải pháp</div>
+      <ul class="checks">
+        <li>Cấu hình tường minh IP `host="127.0.0.1"` thay vì chữ "localhost".</li>
+        <li>Thêm cờ `use_pure=True` trong trình kết nối để ép buộc Python dùng kết nối mạng TCP/IP thuần túy, loại bỏ việc hệ thống cố gắng tìm Unix Sockets không tương thích.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 44: Role 4 Issue 2 -->
+<div class="slide" id="s44">
+  <div class="tag tag-issue">UI/UX · Vấn đề 2 / 6</div>
+  <h2 class="grad-amber">Mất kết nối Hive (HiveServer2 Timeout)</h2>
+  <div class="g2" style="margin-top: 32px; flex: 1;">
+    <div class="issue">
+      <div class="row-label">Nguyên nhân</div>
+      <div class="row-text muted">Server HiveServer2 khởi động mất nhiều thời gian, hoặc RAM máy ảo có lúc không ổn định dẫn đến Port 10000 bị Timeout, làm Dashboard hoàn toàn trắng xóa không có dữ liệu.</div>
+    </div>
+    <div class="card" style="border-left: 4px solid var(--green);">
+      <div class="row-label">Giải pháp (3-Layer Fallback)</div>
+      <ul class="checks">
+        <li>Tạo hàm kết nối bảo vệ 3 lớp:</li>
+        <li>Tầng 1: Ưu tiên dùng PyHive TCP/IP (Nhanh nhất).</li>
+        <li>Tầng 2: Nếu lỗi, giáng cấp gọi lệnh Subprocess (`hive -S -e "SQL"`).</li>
+        <li>Tầng 3: Nếu vẫn lỗi mạng, load `Mock Data` (Dữ liệu dự phòng) để UI luôn luôn vẽ được biểu đồ không bao giờ sập.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 45: Role 4 Issue 3 -->
+<div class="slide" id="s45">
+  <div class="tag tag-issue">UI/UX · Vấn đề 3 / 6</div>
+  <h2 class="grad-amber">Dashboard Lag / Chạy lại Query liên tục</h2>
+  <div class="g2" style="margin-top: 32px; flex: 1;">
+    <div class="issue">
+      <div class="row-label">Nguyên nhân</div>
+      <div class="row-text muted">Đặc tính của Streamlit là Reload/Rerun toàn bộ Code mỗi khi người dùng có thao tác click/chọn. Nếu mỗi lần Rerun lại gửi 6 câu lệnh Query nặng nề lên Hive, Dashboard sẽ lag kinh khủng.</div>
+    </div>
+    <div class="card" style="border-left: 4px solid var(--green);">
+      <div class="row-label">Giải pháp (Session Caching)</div>
+      <ul class="checks">
+        <li>Gom 6 Query thành hàm `batch_query_all_views()`.</li>
+        <li>Lưu kết quả Dataframe vào `st.session_state`.</li>
+        <li>Chỉ truy vấn Hive duy nhất 1 lần khi bật ứng dụng. Các thao tác zoom/click sau đó chỉ lấy data lưu trữ trong RAM, tốc độ mượt mà tuyệt đối.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 46: Role 4 Issue 4 -->
+<div class="slide" id="s46">
+  <div class="tag tag-issue">UI/UX · Vấn đề 4 / 6</div>
+  <h2 class="grad-amber">Hiển thị xấu Mảng Lồng nhau (Nested Array)</h2>
+  <div class="g2" style="margin-top: 32px; flex: 1;">
+    <div class="issue">
+      <div class="row-label">Nguyên nhân</div>
+      <div class="row-text muted">Khi hiển thị bảng nhà hàng từ CSDL, cột `reviews` chứa hàng chục bình luận dạng mảng JSON khiến giao diện DataFrame của Streamlit bị phình to khủng khiếp, chữ bị cắt dở dang cực kỳ xấu.</div>
+    </div>
+    <div class="card" style="border-left: 4px solid var(--green);">
+      <div class="row-label">Giải pháp</div>
+      <ul class="checks">
+        <li>Loại bỏ cột `reviews` khi hiển thị bảng chung. Thay vào đó hiển thị cột con số `review_count` gọn gàng.</li>
+        <li>Thiết kế UI Tương tác: Bổ sung 1 Checkbox "Show reviews?". Chỉ khi click vào 1 nhà hàng cụ thể, UI mới mở rộng thêm 1 bảng Dataframe phụ bên dưới liệt kê chi tiết các dòng review.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 47: Role 4 Issue 5 -->
+<div class="slide" id="s47">
+  <div class="tag tag-issue">UI/UX · Vấn đề 5 / 6</div>
+  <h2 class="grad-amber">Biểu đồ vỡ bố cục trên màn hình nhỏ</h2>
+  <div class="g2" style="margin-top: 32px; flex: 1;">
+    <div class="issue">
+      <div class="row-label">Nguyên nhân</div>
+      <div class="row-text muted">Màn hình laptop độ phân giải khác nhau làm 6 Biểu đồ Plotly bị tràn viền (Overflow) tạo ra thanh trượt ngang, phá vỡ trải nghiệm quan sát tổng thể.</div>
+    </div>
+    <div class="card" style="border-left: 4px solid var(--green);">
+      <div class="row-label">Giải pháp (Responsive Layout)</div>
+      <ul class="checks">
+        <li>Cấu hình `layout="wide"` từ cấp độ thư mục.</li>
+        <li>Sử dụng lưới cột tự động: `col1, col2 = st.columns(2)`.</li>
+        <li>Quan trọng nhất: Bật tham số `use_container_width=True` cho tất cả Chart Plotly để ép biểu đồ tự co giãn theo chiều ngang của màn hình thiết bị (Mobile hay Desktop).</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 48: Role 4 Issue 6 -->
+<div class="slide" id="s48">
+  <div class="tag tag-issue">UI/UX · Vấn đề 6 / 6</div>
+  <h2 class="grad-amber">Nhu cầu Export dữ liệu từ Dashboard</h2>
+  <div class="g2" style="margin-top: 32px; flex: 1;">
+    <div class="issue">
+      <div class="row-label">Nguyên nhân</div>
+      <div class="row-text muted">Plotly cung cấp icon chụp ảnh màn hình PNG, nhưng người dùng doanh nghiệp muốn tải toàn bộ con số đằng sau biểu đồ dưới dạng Excel/CSV để làm báo cáo riêng. Streamlit không có sẵn chức năng này.</div>
+    </div>
+    <div class="card" style="border-left: 4px solid var(--green);">
+      <div class="row-label">Giải pháp</div>
+      <ul class="checks">
+        <li>Bổ sung khu vực "📥 Download Data".</li>
+        <li>Biến đổi Dataframe `views` trong bộ nhớ thành file Text CSV (`df.to_csv`).</li>
+        <li>Tích hợp component `st.download_button` cho phép tải trực tiếp file phân tích của Hadoop về máy mà không cần mở Terminal.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 49: Summary Role 4 -->
+<div class="slide" id="s49">
+  <div class="tag tag-r4">Tổng kết Role 4</div>
+  <h2 class="grad-amber">Thành quả của UI Developer</h2>
+  <div class="g2" style="margin-top: 40px; flex: 1;">
+    <div class="card" style="border-color: var(--amber);">
+      <h3 style="margin-bottom: 20px; color: var(--text);">Hệ thống Vận hành Trực tiếp</h3>
+      <ul class="checks">
+        <li>Cung cấp giao diện CRUD chuyên nghiệp kết nối thời gian thực đến MySQL.</li>
+        <li>Giải quyết triệt để bài toán Connection Drop.</li>
+      </ul>
+    </div>
+    <div class="card" style="border-color: var(--green);">
+      <h3 style="margin-bottom: 20px; color: var(--text);">Trực quan Dữ liệu Lớn</h3>
+      <ul class="checks">
+        <li>Render mượt mà 6 biểu đồ OLAP có giá trị kinh doanh.</li>
+        <li>Tối ưu trải nghiệm: Caching nhanh, Tải CSV, Giao diện Responsive mọi thiết bị. Mảnh ghép hoàn thiện đồ án.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- -------------------------- -->
+<!-- KẾT LUẬN CHUNG             -->
+<!-- -------------------------- -->
+
+<!-- SLIDE 50: Kết luận Đồ án -->
+<div class="slide" id="s50">
+  <div class="tag tag-sys">TỔNG KẾT &amp; HƯỚNG PHÁT TRIỂN</div>
+  <h2 class="grad-all">Kết Luận Đồ Án Big Data</h2>
+  <div class="g2" style="margin-top: 20px; flex: 1;">
+    <div class="card">
+      <h3 style="margin-bottom: 12px; color: var(--cyan);">Mục tiêu &amp; Kết quả đạt được</h3>
+      <ul class="checks" style="font-size: 18px;">
+        <li>Xây dựng **Pipeline hoàn chỉnh** từ Crawl → MongoDB/MySQL → HDFS → Hive/MapReduce → UI Streamlit.</li>
+        <li>Phân tích Sentiment và xu hướng với lượng dữ liệu thực tế (>40,000 dòng).</li>
+        <li>Hiểu sâu sắc và làm chủ toàn bộ **Hệ sinh thái Apache Hadoop** (HDFS, YARN, Hive, MapReduce).</li>
+      </ul>
+      <h3 style="margin-bottom: 12px; margin-top: 24px; color: var(--red);">Hạn chế còn tồn tại</h3>
+      <ul class="checks" style="font-size: 18px;">
+        <li><span style="color: var(--text2);">MapReduce xử lý dạng Batch (Định kỳ), chưa đáp ứng được Real-time.</span></li>
+        <li><span style="color: var(--text2);">Sentiment Lexicon đơn giản, chưa hiểu sâu ngữ pháp Tiếng Việt phức tạp.</span></li>
+        <li><span style="color: var(--text2);">Crawler vẫn phụ thuộc vào Playwright làm chậm tốc độ quét.</span></li>
+      </ul>
+    </div>
+
+    <div class="card" style="border-color: var(--blue);">
+      <h3 style="margin-bottom: 20px; color: var(--green);">Hướng Phát triển Tương lai (Future Work)</h3>
+      <div style="background: rgba(34,197,94,0.1); padding: 16px; border-radius: 8px; margin-bottom: 12px;">
+        <strong style="color: var(--green);">1. Streaming Data (Real-time)</strong><br>
+        <span style="color: var(--text2); font-size: 16px;">Đưa Apache Kafka vào Pipeline để thu thập bình luận từ mạng xã hội theo thời gian thực thay vì chạy Cron Job cào tĩnh.</span>
+      </div>
+      <div style="background: rgba(79,142,247,0.1); padding: 16px; border-radius: 8px; margin-bottom: 12px;">
+        <strong style="color: var(--blue);">2. Apache Spark Thay thế MapReduce</strong><br>
+        <span style="color: var(--text2); font-size: 16px;">Nâng cấp Engine từ MapReduce sang Spark (In-memory) để tính toán nhanh gấp 10-100 lần.</span>
+      </div>
+      <div style="background: rgba(155,110,243,0.1); padding: 16px; border-radius: 8px;">
+        <strong style="color: var(--purple);">3. AI / Machine Learning (NLP)</strong><br>
+        <span style="color: var(--text2); font-size: 16px;">Tích hợp mô hình ngôn ngữ lớn (LLM) hoặc PhoBERT để phân tích sắc thái cảm xúc Tiếng Việt chuẩn xác nhất, thay vì đếm từ khóa thô.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /deck -->
+
+<div class="nav">
+  <button onclick="prev()" id="btn-prev">← Trước</button>
+  <div class="dots" id="dots"></div>
+  <span class="counter" id="ctr">1 / 50</span>
+  <button onclick="next()" id="btn-next">Tiếp →</button>
+</div>
+<div class="kbd">← → Space</div>
+
+<script>
+  const slides = [...document.querySelectorAll('.slide')];
+  const N = slides.length;
+  let cur = 0;
+
+  const dotsEl = document.getElementById('dots');
+  const ctrEl  = document.getElementById('ctr');
+
+  for (let i = 0; i < N; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i === 0 ? ' active' : '');
+    d.onclick = () => go(i);
+    dotsEl.appendChild(d);
+  }
+
+  function go(idx) {
+    slides[cur].classList.remove('active');
+    dotsEl.children[cur].classList.remove('active');
+    cur = Math.max(0, Math.min(N - 1, idx));
+    slides[cur].classList.add('active');
+    slides[cur].scrollTop = 0;
+    dotsEl.children[cur].classList.add('active');
+    ctrEl.textContent = `${cur + 1} / ${N}`;
+    document.getElementById('btn-prev').style.opacity = cur === 0 ? '.3' : '1';
+    document.getElementById('btn-next').style.opacity = cur === N - 1 ? '.3' : '1';
+  }
+
+  function next() { go(cur + 1); }
+  function prev() { go(cur - 1); }
+
+  document.addEventListener('keydown', e => {
+    if (['ArrowRight','ArrowDown',' '].includes(e.key)) { e.preventDefault(); next(); }
+    if (['ArrowLeft','ArrowUp'].includes(e.key)) { e.preventDefault(); prev(); }
+    if (e.key === 'Home') go(0);
+    if (e.key === 'End')  go(N - 1);
+  });
+
+  let tx = 0;
+  document.addEventListener('touchstart', e => { tx = e.touches[0].clientX; });
+  document.addEventListener('touchend', e => {
+    const dx = tx - e.changedTouches[0].clientX;
+    if (Math.abs(dx) > 50) dx > 0 ? next() : prev();
+  });
+
+  go(0);
+</script>
+</body>
+</html>

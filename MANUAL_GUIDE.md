@@ -179,7 +179,7 @@ Các lệnh truy vấn mẫu:
 ```javascript
 // Xem danh sách DB và sử dụng database dự án
 show dbs
-use food_sentiment_db
+use sentiment_db
 
 // Kiểm tra danh sách collections
 show collections
