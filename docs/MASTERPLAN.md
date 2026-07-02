@@ -154,7 +154,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
   - **Implementation**: Create standard workspace layout (`bin/`, `src/`, `config/`, `data/`, `docs/`). Add a robust `.gitignore` file to ignore local databases (`data/db/`), HDFS metadata (`data/hdfs/`), Python virtual environments (`venv/`), environment variables (`.env`), and compiled Python files (`__pycache__/`).
   - **DoD**: Run `git status` showing clean working tree with only tracked template files.
 - [x] **Task 1.2: Implement `bin/setup.sh`**
-  - **Prerequisite Reading**: [GEMINI.md](file:///d:/Project/final-bdes/GEMINI.md), [ARCHITECTURE.md](file:///d:/Project/final-bdes/docs/ARCHITECTURE.md)
+  - **Prerequisite Reading**: [GEMINI.md](../GEMINI.md), [ARCHITECTURE.md](../docs/ARCHITECTURE.md)
   - **Implementation Constraints**:
     - Do **NOT** install system-wide services like MySQL Server, MongoDB Server, Apache Hadoop, or Apache Hive.
     - Check if basic command-line dependencies are available (`python3`, `pip3`, `java`).
@@ -226,10 +226,10 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
 ### Cycle 4: Analytics & MapReduce Engine (8 Analytical Jobs)
 *Goal: Write and test 8 independent MapReduce jobs using Python's `mrjob` library running on YARN.*
 
-- **Prerequisite Reading**: [GEMINI.md](file:///d:/Project/final-bdes/GEMINI.md), [ARCHITECTURE.md](file:///d:/Project/final-bdes/docs/ARCHITECTURE.md#3-database-schemas--collections)
+- **Prerequisite Reading**: [GEMINI.md](../GEMINI.md), [ARCHITECTURE.md](../docs/ARCHITECTURE.md#3-database-schemas--collections)
 
 - [x] **Task 4.1: MapReduce Job 1 - Average Rating by District**
-  - **File**: [mr_rating_by_district.py](file:///d:/Project/final-bdes/src/mapreduce/mr_rating_by_district.py)
+  - **File**: [mr_rating_by_district.py](../src/mapreduce/mr_rating_by_district.py)
   - **Step-by-Step**:
     1. Read input JSON Lines representing restaurants.
     2. Extract `district` and `rating` from each record.
@@ -239,7 +239,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
   - **DoD**: Outputs list of districts with their average rating and review counts.
 
 - [x] **Task 4.2: MapReduce Job 2 - Cuisine Frequency Counter**
-  - **File**: [mr_cuisine_count.py](file:///d:/Project/final-bdes/src/mapreduce/mr_cuisine_count.py)
+  - **File**: [mr_cuisine_count.py](../src/mapreduce/mr_cuisine_count.py)
   - **Step-by-Step**:
     1. Read input JSON Lines representing meals.
     2. Map category or area tags to count individual cuisines.
@@ -249,7 +249,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
   - **DoD**: Returns a sorted frequency distribution of cuisine/category tags.
 
 - [x] **Task 4.3: MapReduce Job 3 - Price Category Distribution**
-  - **File**: [mr_price_segment.py](file:///d:/Project/final-bdes/src/mapreduce/mr_price_segment.py)
+  - **File**: [mr_price_segment.py](../src/mapreduce/mr_price_segment.py)
   - **Step-by-Step**:
     1. Read TripAdvisor restaurants.
     2. Map `price_range` categories (e.g. Budget, Moderate, Luxury) to count values.
@@ -259,7 +259,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
   - **DoD**: Aggregates total restaurant count by price category.
 
 - [x] **Task 4.4: MapReduce Job 4 - Review Sentiment Analysis**
-  - **File**: [mr_sentiment_analysis.py](file:///d:/Project/final-bdes/src/mapreduce/mr_sentiment_analysis.py)
+  - **File**: [mr_sentiment_analysis.py](../src/mapreduce/mr_sentiment_analysis.py)
   - **Step-by-Step**:
     1. Parse the TripAdvisor nested reviews structure.
     2. Tokenize `comment` text.
@@ -269,7 +269,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
   - **DoD**: Emits sentiment scores and positive/negative ratios per restaurant.
 
 - [x] **Task 4.5: MapReduce Job 5 - Meal-to-Restaurant Ingredient Matching**
-  - **File**: [mr_ingredient_match.py](file:///d:/Project/final-bdes/src/mapreduce/mr_ingredient_match.py)
+  - **File**: [mr_ingredient_match.py](../src/mapreduce/mr_ingredient_match.py)
   - **Step-by-Step**:
     1. Read meals (ingredients list) and restaurant comments.
     2. Identify mentions of recipe ingredients in user comments.
@@ -278,7 +278,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
   - **DoD**: Yields match frequencies of meal ingredients in restaurant reviews.
 
 - [x] **Task 4.6: MapReduce Job 6 - Top 10 Most Reviewed Restaurants**
-  - **File**: [mr_top_reviewed.py](file:///d:/Project/final-bdes/src/mapreduce/mr_top_reviewed.py)
+  - **File**: [mr_top_reviewed.py](../src/mapreduce/mr_top_reviewed.py)
   - **Step-by-Step**:
     1. Map restaurant name/id to their `review_count`.
     2. Reducer collects all records, sorts them in descending order of `review_count`, and emits the top 10.
@@ -286,7 +286,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
   - **DoD**: Outputs top 10 restaurants sorted by review count.
 
 - [x] **Task 4.7: MapReduce Job 7 - Review Distribution Profile**
-  - **File**: [mr_review_distribution.py](file:///d:/Project/final-bdes/src/mapreduce/mr_review_distribution.py)
+  - **File**: [mr_review_distribution.py](../src/mapreduce/mr_review_distribution.py)
   - **Step-by-Step**:
     1. Parse review ratings (1.0 to 5.0) from reviews array.
     2. Yield `(rating_score, 1)`.
@@ -295,7 +295,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
   - **DoD**: Returns distribution counts of review stars.
 
 - [x] **Task 4.8: MapReduce Job 8 - Delivery Status Analysis**
-  - **File**: [mr_delivery_analysis.py](file:///d:/Project/final-bdes/src/mapreduce/mr_delivery_analysis.py)
+  - **File**: [mr_delivery_analysis.py](../src/mapreduce/mr_delivery_analysis.py)
   - **Step-by-Step**:
     1. Classify restaurants based on delivery keywords in comments/description.
     2. Correlate delivery availability with sentiment scores.
@@ -308,10 +308,10 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
 ### Cycle 5: DevOps, Backup & Resilience
 *Goal: Secure databases with backup recovery shell commands.*
 
-- **Prerequisite Reading**: [TROUBLESHOOTING.md](file:///d:/Project/final-bdes/docs/TROUBLESHOOTING.md), [GEMINI.md](file:///d:/Project/final-bdes/GEMINI.md)
+- **Prerequisite Reading**: [TROUBLESHOOTING.md](../docs/TROUBLESHOOTING.md), [GEMINI.md](../GEMINI.md)
 
 - [x] **Task 5.1: Automate MongoDB & MySQL Backup & Restore**
-  - **Files**: [db_backup.sh](file:///d:/Project/final-bdes/src/backup/db_backup.sh) / [db_restore.sh](file:///d:/Project/final-bdes/src/backup/db_restore.sh)
+  - **Files**: [db_backup.sh](../src/backup/db_backup.sh) / [db_restore.sh](../src/backup/db_restore.sh)
   - **Step-by-Step**:
     1. Write `db_backup.sh` to run `mysqldump` and `mongodump`, outputting to a timestamped folder in `/data/backups/`.
     2. Write `db_restore.sh` using `mysql` client and `mongorestore` to load the specified dump.
@@ -319,7 +319,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
   - **DoD**: Backups generate files with non-zero sizes; restore successfully recovers mock data after simulated drops.
 
 - [x] **Task 5.2: Port & Service Checks**
-  - **File**: [run.sh](file:///d:/Project/final-bdes/bin/run.sh)
+  - **File**: [run.sh](../bin/run.sh)
   - **Step-by-Step**:
     1. Integrate active socket detection checks (`ss -tln` or `netstat`) inside `bin/run.sh`.
     2. Check ports: 3306 (MySQL), 27017 (MongoDB), 9000 (HDFS), 10000 (Hive Server 2), and 8501 (Streamlit).
@@ -331,10 +331,10 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
 ### Cycle 6: Interactive GUI (Streamlit Web Dashboard)
 *Goal: Build a beautiful, interactive frontend on WSL2 connecting to MySQL/Hive and triggering HDFS/MapReduce.*
 
-- **Prerequisite Reading**: [GEMINI.md](file:///d:/Project/final-bdes/GEMINI.md#technical-stack-and-version-specifications), [ARCHITECTURE.md](file:///d:/Project/final-bdes/docs/ARCHITECTURE.md#25-data-warehouse-layer)
+- **Prerequisite Reading**: [GEMINI.md](../GEMINI.md#technical-stack-and-version-specifications), [ARCHITECTURE.md](../docs/ARCHITECTURE.md#25-data-warehouse-layer)
 
 - [x] **Task 6.1: Build Streamlit Base Layout**
-  - **File**: [app.py](file:///d:/Project/final-bdes/src/streamlit_app/app.py)
+  - **File**: [app.py](../src/streamlit_app/app.py)
   - **Step-by-Step**:
     1. Create a multi-page sidebar layout (pages: Data Management/CRUD, Big Data Reports, Job Execution).
     2. Setup page settings, load styling headers (vibrant/dark mode theme).
@@ -342,7 +342,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
   - **DoD**: The application runs on port 8501 showing structured navigation tabs.
 
 - [x] **Task 6.2: Create Full MySQL CRUD Interface**
-  - **File**: [app.py](file:///d:/Project/final-bdes/src/streamlit_app/app.py)
+  - **File**: [app.py](../src/streamlit_app/app.py)
   - **Step-by-Step**:
     1. Add forms to insert new restaurant listings into MySQL table `restaurants`.
     2. Query listings with search filters, edit attributes, and execute DELETE operations.
@@ -350,7 +350,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
   - **DoD**: Users can perform C, R, U, D operations directly on the screen with instant UI feedback.
 
 - [x] **Task 6.3: Develop Visualization Page (6 Charts, 3 Types)**
-  - **File**: [app.py](file:///d:/Project/final-bdes/src/streamlit_app/app.py)
+  - **File**: [app.py](../src/streamlit_app/app.py)
   - **Step-by-Step**:
     1. Fetch aggregated MapReduce results from Apache Hive tables.
     2. Render 6 Plotly charts:
@@ -361,7 +361,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
   - **DoD**: Screen renders exactly 6 interactive Plotly charts across 3 different visualization types.
 
 - [x] **Task 6.4: DevOps Operations Triggers**
-  - **File**: [app.py](file:///d:/Project/final-bdes/src/streamlit_app/app.py)
+  - **File**: [app.py](../src/streamlit_app/app.py)
   - **Step-by-Step**:
     1. Add UI buttons to trigger `db_backup.sh` and execution of MapReduce scripts using `subprocess`.
     2. Print stdout/stderr logs in the UI to notify the developer of success.
@@ -370,9 +370,9 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
 
 - [x] **Task 6.5: Connect Big Data Reports Page to Apache Hive (Live OLAP Queries)**
   - **Files**:
-    - [app.py](file:///d:/Project/final-bdes/src/streamlit_app/app.py)
-    - [hive_analytics.sql](file:///d:/Project/final-bdes/src/ingest/hive_analytics.sql) *(new)*
-    - [hive_connector.py](file:///d:/Project/final-bdes/src/streamlit_app/hive_connector.py) *(new)*
+    - [app.py](../src/streamlit_app/app.py)
+    - [hive_analytics.sql](../src/ingest/hive_analytics.sql) *(new)*
+    - [hive_connector.py](../src/streamlit_app/hive_connector.py) *(new)*
   - **Background**: Task 6.3 completed 6 Plotly charts using mock/static DataFrames. The existing `run_hive_query()` function in `app.py` is already scaffolded but never called. The Hive external tables are already defined in `hive_schema.sql` and mapped to HDFS `/data/raw/`. This task replaces mock DataFrames with real Hive OLAP results.
   - **Step-by-Step**:
     1. **Create `src/ingest/hive_analytics.sql`**: Define 6 HiveQL analytic views/queries, each mapping to one Plotly chart in the Reports page:
@@ -412,7 +412,7 @@ This Master Plan divides the Food & Restaurant Sentiment Analysis System on Ubun
 ### Cycle 7: Verification, Slides & Demo Video
 *Goal: Finalize reports, slide decks, and record a high-quality video following HCMUTE standards.*
 
-- **Prerequisite Reading**: [REQUIREMENTS.md](file:///d:/Project/final-bdes/docs/REQUIREMENTS.md#4-yeu-cau-ve-bao-cao-slides--video)
+- **Prerequisite Reading**: [REQUIREMENTS.md](../docs/REQUIREMENTS.md#4-yeu-cau-ve-bao-cao-slides--video)
 
 - [ ] **Task 7.1: End-to-End Integration Testing**
   - **Step-by-Step**:

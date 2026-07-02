@@ -33,13 +33,13 @@
 
 ## 2. Các tệp tin được tạo mới và cập nhật
 
-- [requirements.txt](file:///d:/Project/final-bdes/requirements.txt) (Cập nhật thư viện `mysql-connector-python`)
-- [bin/setup.sh](file:///d:/Project/final-bdes/bin/setup.sh) (Mới)
-- [bin/run.sh](file:///d:/Project/final-bdes/bin/run.sh) (Mới)
-- [src/ingest/init_db.py](file:///d:/Project/final-bdes/src/ingest/init_db.py) (Mới)
-- [src/ingest/mongo_to_hdfs.py](file:///d:/Project/final-bdes/src/ingest/mongo_to_hdfs.py) (Mới)
-- [src/ingest/mysql_to_hdfs.py](file:///d:/Project/final-bdes/src/ingest/mysql_to_hdfs.py) (Mới)
-- [src/ingest/hive_schema.sql](file:///d:/Project/final-bdes/src/ingest/hive_schema.sql) (Mới)
+- [requirements.txt](../../requirements.txt) (Cập nhật thư viện `mysql-connector-python`)
+- [bin/setup.sh](../../bin/setup.sh) (Mới)
+- [bin/run.sh](../../bin/run.sh) (Mới)
+- [src/ingest/init_db.py](../../src/ingest/init_db.py) (Mới)
+- [src/ingest/mongo_to_hdfs.py](../../src/ingest/mongo_to_hdfs.py) (Mới)
+- [src/ingest/mysql_to_hdfs.py](../../src/ingest/mysql_to_hdfs.py) (Mới)
+- [src/ingest/hive_schema.sql](../../src/ingest/hive_schema.sql) (Mới)
 
 ---
 

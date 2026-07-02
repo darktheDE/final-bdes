@@ -20,17 +20,17 @@ Chúng tôi đã thiết lập thành công và kiểm thử toàn bộ **8 chư
 
 ## 2. Các tệp tin được tạo mới và cập nhật
 
-- [src/mapreduce/mr_rating_by_district.py](file:///d:/Project/final-bdes/src/mapreduce/mr_rating_by_district.py) (Mới)
-- [src/mapreduce/mr_cuisine_count.py](file:///d:/Project/final-bdes/src/mapreduce/mr_cuisine_count.py) (Mới)
-- [src/mapreduce/mr_price_segment.py](file:///d:/Project/final-bdes/src/mapreduce/mr_price_segment.py) (Mới)
-- [src/mapreduce/mr_sentiment_analysis.py](file:///d:/Project/final-bdes/src/mapreduce/mr_sentiment_analysis.py) (Mới)
-- [src/mapreduce/mr_ingredient_match.py](file:///d:/Project/final-bdes/src/mapreduce/mr_ingredient_match.py) (Mới)
-- [src/mapreduce/mr_top_reviewed.py](file:///d:/Project/final-bdes/src/mapreduce/mr_top_reviewed.py) (Mới)
-- [src/mapreduce/mr_review_distribution.py](file:///d:/Project/final-bdes/src/mapreduce/mr_review_distribution.py) (Mới)
-- [src/mapreduce/mr_delivery_analysis.py](file:///d:/Project/final-bdes/src/mapreduce/mr_delivery_analysis.py) (Mới)
-- [src/mapreduce/test_local.py](file:///d:/Project/final-bdes/src/mapreduce/test_local.py) (Mới - Tự động tạo dữ liệu mẫu và kiểm thử nội bộ cục bộ)
-- [src/mapreduce/run_all_jobs.py](file:///d:/Project/final-bdes/src/mapreduce/run_all_jobs.py) (Mới - Script tự động dọn dẹp HDFS output cũ và chạy tuần tự 8 jobs trên Hadoop YARN)
-- [mrjob.conf](file:///d:/Project/final-bdes/mrjob.conf) (Mới - Tệp cấu hình phân vùng chạy cho mrjob chỉ định đúng đường dẫn python venv)
+- [src/mapreduce/mr_rating_by_district.py](../../src/mapreduce/mr_rating_by_district.py) (Mới)
+- [src/mapreduce/mr_cuisine_count.py](../../src/mapreduce/mr_cuisine_count.py) (Mới)
+- [src/mapreduce/mr_price_segment.py](../../src/mapreduce/mr_price_segment.py) (Mới)
+- [src/mapreduce/mr_sentiment_analysis.py](../../src/mapreduce/mr_sentiment_analysis.py) (Mới)
+- [src/mapreduce/mr_ingredient_match.py](../../src/mapreduce/mr_ingredient_match.py) (Mới)
+- [src/mapreduce/mr_top_reviewed.py](../../src/mapreduce/mr_top_reviewed.py) (Mới)
+- [src/mapreduce/mr_review_distribution.py](../../src/mapreduce/mr_review_distribution.py) (Mới)
+- [src/mapreduce/mr_delivery_analysis.py](../../src/mapreduce/mr_delivery_analysis.py) (Mới)
+- [src/mapreduce/test_local.py](../../src/mapreduce/test_local.py) (Mới - Tự động tạo dữ liệu mẫu và kiểm thử nội bộ cục bộ)
+- [src/mapreduce/run_all_jobs.py](../../src/mapreduce/run_all_jobs.py) (Mới - Script tự động dọn dẹp HDFS output cũ và chạy tuần tự 8 jobs trên Hadoop YARN)
+- [mrjob.conf](../../mrjob.conf) (Mới - Tệp cấu hình phân vùng chạy cho mrjob chỉ định đúng đường dẫn python venv)
 
 ---
 
@@ -60,7 +60,7 @@ python src/mapreduce/run_all_jobs.py
 ```
 
 * Kịch bản sẽ tự động xóa các thư mục kết quả cũ trên HDFS (tại `/data/output/mr_*`) để tránh lỗi ghi đè.
-* Chạy tuần tự các Job trên YARN bằng cách chỉ định tệp cấu hình [mrjob.conf](file:///d:/Project/final-bdes/mrjob.conf) (để tránh lỗi thiếu thư viện `distutils` trên Python 3.12+ của hệ thống).
+* Chạy tuần tự các Job trên YARN bằng cách chỉ định tệp cấu hình [mrjob.conf](../../mrjob.conf) (để tránh lỗi thiếu thư viện `distutils` trên Python 3.12+ của hệ thống).
 
 Để chạy lẻ một Job thủ công trên cụm:
 ```bash
@@ -76,7 +76,7 @@ python src/mapreduce/mr_rating_by_district.py -r hadoop hdfs:///data/raw/restaur
 * **Nguyên nhân**: Hệ điều hành Ubuntu 24.04 LTS sử dụng Python 3.12 làm mặc định. Python 3.12 đã loại bỏ hoàn toàn thư viện chuẩn `distutils` vốn được `mrjob` import. Khi chạy trên YARN, mặc định hệ thống chạy bằng `/usr/bin/python3` (system python) chứ không sử dụng virtual environment `venv` của chúng ta nơi setuptools được cài đặt.
 * **Giải pháp khắc phục**:
   1. Cài đặt thêm thư viện `setuptools` vào venv: `./venv/bin/pip install setuptools` (để hỗ trợ module distutils giả lập).
-  2. Tạo file cấu hình [mrjob.conf](file:///d:/Project/final-bdes/mrjob.conf) tại thư mục gốc để cấu hình tham số `python_bin` trỏ trực tiếp đến Python trong môi trường ảo của dự án:
+  2. Tạo file cấu hình [mrjob.conf](../../mrjob.conf) tại thư mục gốc để cấu hình tham số `python_bin` trỏ trực tiếp đến Python trong môi trường ảo của dự án:
      ```yaml
      runners:
        hadoop:

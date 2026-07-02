@@ -48,8 +48,8 @@ Xây dựng giao diện web dashboard tương tác sử dụng **Streamlit 1.35+
 
 | File | Trạng thái | Ghi chú |
 |:-----|:-----------|:--------|
-| [`src/streamlit_app/app.py`](file:///d:/Project/final-bdes/src/streamlit_app/app.py) | **Tạo mới** | File chính toàn bộ Streamlit dashboard |
-| [`docs/MASTERPLAN.md`](file:///d:/Project/final-bdes/docs/MASTERPLAN.md) | **Cập nhật** | Đánh dấu `[x]` tất cả task Cycle 6 hoàn thành |
+| [`src/streamlit_app/app.py`](../../src/streamlit_app/app.py) | **Tạo mới** | File chính toàn bộ Streamlit dashboard |
+| [`docs/MASTERPLAN.md`](../../docs/MASTERPLAN.md) | **Cập nhật** | Đánh dấu `[x]` tất cả task Cycle 6 hoàn thành |
 
 ---
 
@@ -247,16 +247,16 @@ Trang *Big Data Reports* trong Streamlit đã dùng mock data tĩnh từ đầu.
 
 | File | Mô tả |
 |:-----|:------|
-| [`src/ingest/hive_analytics.sql`](file:///d:/Project/final-bdes/src/ingest/hive_analytics.sql) | 6 `CREATE VIEW` HiveQL tương ứng 6 biểu đồ Plotly |
-| [`src/streamlit_app/hive_connector.py`](file:///d:/Project/final-bdes/src/streamlit_app/hive_connector.py) | Module kết nối Hive 3 lớp: pyhive → subprocess CLI → offline mock |
+| [`src/ingest/hive_analytics.sql`](../../src/ingest/hive_analytics.sql) | 6 `CREATE VIEW` HiveQL tương ứng 6 biểu đồ Plotly |
+| [`src/streamlit_app/hive_connector.py`](../../src/streamlit_app/hive_connector.py) | Module kết nối Hive 3 lớp: pyhive → subprocess CLI → offline mock |
 
 ### 8.3 Các file cập nhật
 
 | File | Thay đổi |
 |:-----|:---------|
-| [`src/streamlit_app/app.py`](file:///d:/Project/final-bdes/src/streamlit_app/app.py) | `render_reports_page()`: mock → live Hive queries + status badge |
-| [`requirements.txt`](file:///d:/Project/final-bdes/requirements.txt) | Thêm `pyhive[hive]`, `thrift`, `thrift-sasl` |
-| [`docs/MASTERPLAN.md`](file:///d:/Project/final-bdes/docs/MASTERPLAN.md) | Bổ sung và đánh dấu `[x]` Task 6.5 |
+| [`src/streamlit_app/app.py`](../../src/streamlit_app/app.py) | `render_reports_page()`: mock → live Hive queries + status badge |
+| [`requirements.txt`](../../requirements.txt) | Thêm `pyhive[hive]`, `thrift`, `thrift-sasl` |
+| [`docs/MASTERPLAN.md`](../../docs/MASTERPLAN.md) | Bổ sung và đánh dấu `[x]` Task 6.5 |
 
 ### 8.4 Quy trình chạy Hive views (WSL2)
 
@@ -512,11 +512,11 @@ User vào trang Big Data Reports
 
 | File | Thay đổi chính |
 |:-----|:---------------|
-| [`src/ingest/hive_schema.sql`](file:///d:/Project/final-bdes/src/ingest/hive_schema.sql) | Không đổi — 5 external tables đã có |
-| [`src/ingest/hive_analytics.sql`](file:///d:/Project/final-bdes/src/ingest/hive_analytics.sql) | **MỚI** — 6 CREATE VIEW HiveQL |
-| [`src/streamlit_app/hive_connector.py`](file:///d:/Project/final-bdes/src/streamlit_app/hive_connector.py) | **MỚI** — module 3-lớp fallback + `batch_query_all_views()` + `HIVE_QUERY_TIMEOUT=180` |
-| [`src/streamlit_app/app.py`](file:///d:/Project/final-bdes/src/streamlit_app/app.py) | Cập nhật — `render_reports_page()` dùng batch + session_state cache |
-| [`requirements.txt`](file:///d:/Project/final-bdes/requirements.txt) | Cập nhật — thêm `pyhive[hive]`, `thrift`, `thrift-sasl` |
+| [`src/ingest/hive_schema.sql`](../../src/ingest/hive_schema.sql) | Không đổi — 5 external tables đã có |
+| [`src/ingest/hive_analytics.sql`](../../src/ingest/hive_analytics.sql) | **MỚI** — 6 CREATE VIEW HiveQL |
+| [`src/streamlit_app/hive_connector.py`](../../src/streamlit_app/hive_connector.py) | **MỚI** — module 3-lớp fallback + `batch_query_all_views()` + `HIVE_QUERY_TIMEOUT=180` |
+| [`src/streamlit_app/app.py`](../../src/streamlit_app/app.py) | Cập nhật — `render_reports_page()` dùng batch + session_state cache |
+| [`requirements.txt`](../../requirements.txt) | Cập nhật — thêm `pyhive[hive]`, `thrift`, `thrift-sasl` |
 | `/usr/local/hive/conf/hive-env.sh` | **MỚI** (hệ thống) — `JAVA_HOME=java-8-openjdk-amd64` |
 
 ---

@@ -1,87 +1,138 @@
-# Đồ án Nhập môn Dữ liệu lớn (BDES333877)
-## Hệ thống phân tích ý kiến khách hàng và quản lý ẩm thực (Food & Restaurant Sentiment Analysis System)
+# Food & Restaurant Sentiment Analysis System
 
-Dự án cuối kỳ của nhóm 4 thành viên. Dự án được phát triển và chạy trực tiếp trên môi trường **Ubuntu 24.04 LTS trên WSL2 (Windows Subsystem for Linux)** thông qua các tập lệnh tự động hóa Bash Shell.
+[![Ubuntu](https://img.shields.io/badge/OS-Ubuntu%2024.04%20LTS%20WSL2-orange.svg)](https://ubuntu.com/)
+[![Java](https://img.shields.io/badge/Java-8%20OpenJDK-blue.svg)](https://openjdk.org/)
+[![Hadoop](https://img.shields.io/badge/Apache%20Hadoop-3.3.6-red.svg)](https://hadoop.apache.org/)
+[![Hive](https://img.shields.io/badge/Apache%20Hive-3.1.3-yellow.svg)](https://hive.apache.org/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-8.0%20LTS-green.svg)](https://www.mongodb.com/)
+[![MySQL](https://img.shields.io/badge/MySQL-8.0-blue.svg)](https://www.mysql.com/)
+[![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11-brightgreen.svg)](https://www.python.org/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.35.0-red.svg)](https://streamlit.io/)
 
----
-
-## 1. Thành viên nhóm & Phân công công việc
-
-| STT | Họ và Tên | MSSV | Vai trò chính | Chi tiết công việc thực hiện | Tỉ lệ đóng góp |
-| :--- | :--- | :---: | :--- | :--- | :---: |
-| 1 | **Nguyễn Văn A** (Trưởng nhóm) | 23112233 | Data Engineer & DB | - Viết mã Python để cào dữ liệu từ TripAdvisor & Gọi API TheMealDB.<br>- Thiết lập MongoDB (Staging thô) và MySQL (CSDL quan hệ cho CRUD). | 100% |
-| 2 | **Trần Thị B** | 23112244 | Hadoop Infrastructure | - Cấu hình hạ tầng Hadoop (HDFS/YARN) và Apache Hive trên WSL2.<br>- Viết Python scripts đồng bộ MySQL/MongoDB sang HDFS. | 100% |
-| 3 | **Phan Kim E** | 23112235 | MapReduce Developer | - Xây dựng và tối ưu 8 chương trình MapReduce bằng Python (`mrjob`).<br>- Viết kịch bản sao lưu và phục hồi dữ liệu tự động (`db_backup.sh`/`db_restore.sh`). | 100% |
-| 4 | **Bùi Quang F** | 23112236 | UI Developer & Media | - Phát triển giao diện Dashboard tương tác bằng Streamlit (CRUD trên MySQL, trực quan hóa OLAP từ Hive).<br>- Soạn Slide đề cương & biên tập video demo. | 100% |
+A production-grade, distributed Big Data engineering pipeline and interactive analytical dashboard designed to ingest, process, and analyze culinary sentiment data. Built using a **Hybrid OLTP/OLAP (Polyglot Persistence)** architecture running on **Ubuntu 24.04 LTS via WSL2**, the system orchestrates web scrapers, REST APIs, HDFS distributed storage, MapReduce batch jobs, Apache Hive data warehousing, and a Streamlit frontend.
 
 ---
 
-## 2. Kiến trúc hệ thống & Luồng dữ liệu
+## Table of Contents
 
-Hệ thống được thiết kế theo mô hình **Hybrid Database (Polyglot Persistence)** kết hợp OLTP và OLAP:
+- [Key Features](#key-features)
+- [System Architecture & Data Flow](#system-architecture--data-flow)
+- [Analytics & Dashboard Showcase](#analytics--dashboard-showcase)
+- [Technology Stack](#technology-stack)
+- [Project Directory Structure](#project-directory-structure)
+- [Quick Start Guide](#quick-start-guide)
+  - [Prerequisites](#prerequisites)
+  - [1. Clone Repository & Setup Permissions](#1-clone-repository--setup-permissions)
+  - [2. One-Click Infrastructure Installation](#2-one-click-infrastructure-installation)
+  - [3. Run the Pipeline](#3-run-the-pipeline)
+  - [4. Stop Services & Teardown](#4-stop-services--teardown)
+- [MapReduce Analytics Jobs](#mapreduce-analytics-jobs)
+- [Apache Hive Analytics Views](#apache-hive-analytics-views)
+- [Contributors & Git Commit Tracking](#contributors--git-commit-tracking)
+- [Documentation & Deep Dives](#documentation--deep-dives)
+
+---
+
+## Key Features
+
+- **Automated Data Scraping & Ingestion**: Resilient Web scrapers (Scrapy) and REST API clients (TheMealDB) with built-in anti-bot fallbacks and offline seed capabilities.
+- **Polyglot Persistence**:
+  - **MongoDB (NoSQL Staging)**: Ingests unstructured/semi-structured raw restaurant reviews and culinary recipes.
+  - **MySQL (Relational OLTP)**: Stores normalized relational data for fast CRUD operations and web client transactions.
+  - **Hadoop HDFS (Distributed Data Lake)**: Acts as the storage backplane for bulk `.jsonl` datasets and MapReduce job artifacts.
+- **Distributed Analytics (MapReduce Engine)**: 8 custom Python MapReduce (`mrjob`) analysis jobs executing over Hadoop Streaming.
+- **Data Warehousing (Apache Hive)**: OLAP analytical views mapping HDFS directories for complex SQL aggregations and reporting.
+- **Interactive Web Dashboard (Streamlit)**: Single-pane UI supporting real-time MySQL CRUD management, interactive OLAP chart visualizations, and cluster status monitoring.
+- **Zero-Touch Infrastructure Automation**: Unified shell automation script `install_infra.sh` installing Java 8, Hadoop 3.3.6, Hive 3.1.3, MySQL 8.0, MongoDB 8.0, and Python `venv` on clean Ubuntu 24.04 environments.
+
+---
+
+## System Architecture & Data Flow
+
+Below is the end-to-end architecture diagram detailing data flow from web/API sources to staging databases, HDFS distributed storage, MapReduce processing, Hive warehousing, and Streamlit visualization.
+
+![System Pipeline Architecture](docs/assets/pipeline.jpg)
 
 ```text
-[ TripAdvisor (Scrapy) ] --+
-                           +--> [ MongoDB (NoSQL Staging) ] --+
-[ TheMealDB (REST API) ] --+                                  |
-                                                              +--> [ HDFS (.jsonl) ] --> [ MapReduce x8 ] --> [ HDFS (Results) ]
-                           +--> [ MySQL (Relational OLTP) ] --+                                                       |
-                                      |                                                                                v
-                            [ Streamlit CRUD ]                                                               [ Apache Hive (OLAP) ]
-                                      |                                                                                |
-                                      +------------------------------------------------------------------------> [ Streamlit Reports ]
+[ TripAdvisor Scraper (Scrapy) ] --+
+                                    +--> [ MongoDB (Staging) ] --+
+[ TheMealDB API Client ] ----------+                             |
+                                                                 +--> [ HDFS (.jsonl) ] --> [ MapReduce (8 Jobs) ] --> [ HDFS (Results) ]
+                                   +--> [ MySQL (OLTP) ] -------+                                                            |
+                                              |                                                                               v
+                                     [ Streamlit CRUD ]                                                              [ Apache Hive (OLAP) ]
+                                              |                                                                               |
+                                              +------------------------------------------------------------------------> [ Streamlit Reports ]
 ```
 
-### Kết nối TripAdvisor ↔ TheMealDB
-- **TripAdvisor**: Dữ liệu nhà hàng HCMC (restaurant info, customer reviews, ratings)
-- **TheMealDB**: Dữ liệu công thức nấu ăn quốc tế (category, area, ingredients list)
-- **Điểm kết nối** (`mr_ingredient_match.py`): Dùng danh sách `ingredients` từ TheMealDB làm từ điển để match các nguyên liệu được đề cập trong review TripAdvisor → tìm ra nguyên liệu nào phổ biến nhất trong đánh giá nhà hàng HCMC.
+### Contextual Data Link: TripAdvisor ↔ TheMealDB
+- **TripAdvisor**: Contains restaurant listings, user ratings, geographic metadata, and detailed review text across Ho Chi Minh City.
+- **TheMealDB**: Contains international culinary recipes, categories, regional areas, and structured ingredient lists.
+- **Cross-Analysis Connection (`mr_ingredient_match.py`)**: Uses ingredient vocabulary from TheMealDB to parse and match ingredient mentions inside TripAdvisor reviews, identifying popular culinary ingredients and sentiment correlation.
 
 ---
 
-## 3. Tech Stack & Phiên bản
+## Analytics & Dashboard Showcase
 
-| Component | Version | Vai trò |
-|---|---|---|
-| OpenJDK | **8** LTS | Runtime cho Hadoop & Hive (bắt buộc, Java 11+ gây lỗi Kryo) |
-| Apache Hadoop | **3.3.6** | HDFS phân tán + YARN task scheduler |
-| Apache Hive | **3.1.3** | Data warehouse / OLAP SQL trên HDFS |
-| MongoDB Community | **8.0** LTS | Raw data staging (semi-structured) |
-| MySQL Server | **8.0** | Relational OLTP database |
-| Python | 3.10 / 3.11 | MapReduce (mrjob), crawler, ingest scripts |
-| Streamlit | **1.35.0** | Web dashboard (port 8501) |
-| Scrapy | **2.11.0** | TripAdvisor spider |
+The interactive Streamlit dashboard renders real-time OLAP insights generated by Hive queries and MapReduce batch outputs.
+
+| Ratings per District | Cuisine Category Breakdown |
+| :---: | :---: |
+| ![Ratings per District](docs/assets/plots/ratings-per-area.png) | ![Cuisine Category Breakdown](docs/assets/plots/cusine-cate-breakdown.png) |
+
+| Rating Distribution Histogram | Delivery vs. Dine-in Sentiment |
+| :---: | :---: |
+| ![Rating Histogram Distribution](docs/assets/plots/rating-histogram-distribution.png) | ![Delivery vs Dine-in](docs/assets/plots/deliver-vs-dine-in.png) |
+
+| Star Rating Distribution Curve | Top Districts by Restaurant Density |
+| :---: | :---: |
+| ![Star Rating Distribution Curve](docs/assets/plots/star-rate-dis-curve.png) | ![Top Districts by Restaurant Count](docs/assets/plots/top-area-res-count.png) |
 
 ---
 
-## 4. Cấu trúc thư mục
+## Technology Stack
+
+| Component | Version | Role in Architecture |
+| :--- | :--- | :--- |
+| **Java OpenJDK** | `8 LTS` | Mandatory runtime for Hadoop & Hive (prevents Kryo serialization issues) |
+| **Apache Hadoop** | `3.3.6` | Distributed storage backplane (HDFS) & YARN execution framework |
+| **Apache Hive** | `3.1.3` | Data warehouse providing OLAP SQL query capabilities on top of HDFS |
+| **MongoDB Community** | `8.0 LTS` | Semi-structured staging database for raw scraper JSON payloads |
+| **MySQL Server** | `8.0` | Relational OLTP database powering Streamlit transactional CRUD |
+| **Python** | `3.10 / 3.11` | Core processing language (`mrjob` MapReduce, ETL, Streamlit) |
+| **Streamlit** | `1.35.0` | Interactive web dashboard running on port `8501` |
+| **Scrapy** | `2.11.0` | Async crawling framework for TripAdvisor restaurant & review extraction |
+
+---
+
+## Project Directory Structure
 
 ```text
-final-bdes/
+food-sentiment-analytics-platform/
 │
-├── bin/                        # Bash scripts — entry points
-│   ├── install_infra.sh        # Chạy 1 lần: cài Java, Hadoop, Hive, MySQL, MongoDB, venv
-│   ├── run.sh                  # Chạy pipeline: start services + Streamlit
-│   └── stop.sh                 # Dừng tất cả dịch vụ
+├── bin/                        # Infrastructure & orchestration shell scripts
+│   ├── install_infra.sh        # One-time automated installer (Java, Hadoop, Hive, DBs, venv)
+│   ├── run.sh                  # Main entry point: starts services, runs pipeline & Streamlit
+│   └── stop.sh                 # Graceful service shutdown (supports --backup and --cleandata)
 │
-├── conf/                       # Config files (tách riêng khỏi scripts)
+├── conf/                       # Shared configuration templates
 │   ├── hadoop/                 # core-site.xml, hdfs-site.xml, yarn-site.xml, mapred-site.xml
-│   ├── hive/                   # hive-site.xml
-│   └── mrjob.conf              # mrjob Hadoop runner config
+│   ├── hive/                   # hive-site.xml (metastore & Java 8 setup)
+│   └── mrjob.conf              # Hadoop Streaming runner configuration
 │
 ├── src/
-│   ├── crawler/                # Data crawling
-│   │   ├── tripadvisor_job/    # Scrapy spider
-│   │   ├── fetch_mealdb.py     # TheMealDB API client
-│   │   └── seed/               # Offline fallback data (restaurants.json, meals.json, ...)
-│   ├── ingest/                 # Data normalization & DB initialization
-│   │   ├── init_db.py          # MySQL schema init + normalize data from MongoDB
-│   │   ├── import_tripadvisor.py  # Load scraped data into MongoDB
-│   │   ├── mongo_to_hdfs.py    # Export MongoDB → HDFS (.jsonl)
-│   │   ├── mysql_to_hdfs.py    # Export MySQL → HDFS (.jsonl)
-│   │   ├── hive_schema.sql     # Hive external table definitions
-│   │   └── hive_analytics.sql  # Hive analytics views (7 views)
-│   ├── mapreduce/              # 8 MapReduce jobs (Python mrjob)
+│   ├── crawler/                # Data collection & web scraping modules
+│   │   ├── tripadvisor_job/    # Scrapy spider for TripAdvisor data extraction
+│   │   ├── fetch_mealdb.py     # TheMealDB REST API client
+│   │   └── seed/               # Offline fallback datasets for offline development
+│   ├── ingest/                 # Data normalization, ETL & schema initialization
+│   │   ├── init_db.py          # MySQL schema setup & MongoDB data normalization
+│   │   ├── import_tripadvisor.py  # Load raw scraped JSON into MongoDB
+│   │   ├── mongo_to_hdfs.py    # Export MongoDB collections → HDFS (.jsonl)
+│   │   ├── mysql_to_hdfs.py    # Export MySQL tables → HDFS (.jsonl)
+│   │   ├── hive_schema.sql     # External table definitions for Hive
+│   │   └── hive_analytics.sql  # 7 Analytical OLAP SQL views for Hive
+│   ├── mapreduce/              # Distributed MapReduce analytics jobs (Python mrjob)
 │   │   ├── mr_rating_by_district.py
 │   │   ├── mr_cuisine_count.py
 │   │   ├── mr_rating_bucket.py
@@ -90,127 +141,141 @@ final-bdes/
 │   │   ├── mr_top_reviewed.py
 │   │   ├── mr_review_distribution.py
 │   │   ├── mr_delivery_analysis.py
-│   │   ├── run_all_jobs.py         # Run all 8 jobs with summary output
-│   │   ├── test_local.py           # Local mode test (no Hadoop needed)
-│   │   ├── test_hive_connection.py # HiveServer2 smoke test
-│   │   └── test_district_parsing.py # District normalization unit test
-│   ├── streamlit_app/          # Web dashboard
-│   │   ├── app.py              # Main Streamlit app (CRUD + Reports + DevOps)
-│   │   └── hive_connector.py   # Hive query module (pyhive → CLI → offline fallback)
-│   └── backup/                 # Backup & restore scripts
-│       ├── db_backup.sh        # Backup MySQL + MongoDB
-│       └── db_restore.sh       # Restore from backup
+│   │   └── run_all_jobs.py     # Batch runner & summary generator for all 8 jobs
+│   ├── streamlit_app/          # Web frontend application
+│   │   ├── app.py              # Main dashboard UI (CRUD + OLAP Visuals + DevOps Control)
+│   │   └── hive_connector.py   # Multi-mode Hive query engine (pyhive -> CLI -> fallback)
+│   └── backup/                 # Data protection utilities
+│       ├── db_backup.sh        # Automated MySQL & MongoDB logical backup
+│       └── db_restore.sh       # Database restoration utility
 │
-├── data/                       # Local data (gitignored)
-│   └── backups/                # db_backup.sh output
+├── docs/                       # Comprehensive system documentation
+│   ├── ARCHITECTURE.md         # Detailed architectural design & data flow
+│   ├── MASTERPLAN.md           # Engineering implementation phases
+│   ├── REQUIREMENTS.md         # System requirements & software specifications
+│   ├── TROUBLESHOOTING.md      # Diagnostic & resolution guide
+│   ├── assets/                 # System architecture diagram & dashboard plots
+│   └── process/                # Execution logs and debug session transcripts
 │
-├── docs/                       # Documentation
-│   ├── ARCHITECTURE.md
-│   ├── MASTERPLAN.md
-│   ├── REQUIREMENTS.md
-│   ├── TROUBLESHOOTING.md
-│   ├── rules.md                # Team working rules
-│   └── process/                # Execution logs & debug notes
-│
-├── requirements.txt
-├── GEMINI.md                   # AI agent rules & schema reference
-├── SETUP_GUIDE.md
-└── TEST_PLAN.md
+├── requirements.txt            # Python dependencies
+├── SETUP_GUIDE.md              # Environment setup walkthrough
+└── TEST_PLAN.md                # System verification & test matrix
 ```
 
 ---
 
-## 5. Hướng dẫn khởi chạy nhanh (Quick Start)
+## Quick Start Guide
 
-### Yêu cầu
-- Windows 10/11 với WSL2 cài **Ubuntu 24.04 LTS**
-- RAM tối thiểu 8 GB, ổ cứng còn trống 10 GB+
-- Kết nối internet (để tải Hadoop, Hive lần đầu)
+### Prerequisites
+- **Operating System**: Windows 10/11 running **WSL2 with Ubuntu 24.04 LTS**.
+- **Hardware**: Minimum 8 GB RAM, 10 GB free disk space.
+- **Network**: Active internet connection (for downloading Hadoop, Hive, and apt packages on first run).
 
-### Bước 1: Clone repo & cấp quyền thực thi
+### 1. Clone Repository & Setup Permissions
+
+Run the following commands inside your Ubuntu WSL2 terminal:
 
 ```bash
-# Trong Ubuntu WSL2 terminal
-cd /mnt/d/Project   # hoặc thư mục bạn muốn
-git clone <repo-url> final-bdes
-cd final-bdes
+cd /mnt/d/Project   # Or your preferred working directory
+git clone https://github.com/darktheDE/food-sentiment-analytics-platform.git
+cd food-sentiment-analytics-platform
 chmod +x bin/*.sh src/backup/*.sh
 ```
 
-### Bước 2: Cài đặt hạ tầng (chỉ chạy 1 lần trên máy mới)
+### 2. One-Click Infrastructure Installation
+
+Execute the infrastructure provisioner **once** on a fresh Ubuntu installation:
 
 ```bash
 ./bin/install_infra.sh
 ```
 
-Script này tự động:
-- Kiểm tra và cài Java 8, Hadoop 3.3.6, Hive 3.1.3, MongoDB 8.0, MySQL 8.0
-- Copy XML config từ `conf/` vào các thư mục cài đặt
-- Tạo Python `venv` và cài dependencies từ `requirements.txt`
-- Khởi tạo MySQL schema và load dữ liệu mẫu (seed data)
+This script automatically:
+- Installs Java 8 OpenJDK, Hadoop 3.3.6, Hive 3.1.3, MongoDB 8.0, and MySQL 8.0.
+- Applies pre-configured XML settings from `conf/` to the installed infrastructure components.
+- Configures dedicated MySQL `hive` metastore credentials and downloads required JDBC drivers.
+- Initializes the Python virtual environment (`venv`) and installs `requirements.txt`.
+- Sets up the MySQL schema and populates offline seed data.
 
-### Bước 3: Khởi chạy pipeline
+### 3. Run the Pipeline
+
+Launch the services and open the dashboard:
 
 ```bash
-# Chạy với data đã có (không cào lại):
+# Option A: Run pipeline using existing local/seed data:
 ./bin/run.sh
 
-# Cào dữ liệu mới → ingest → Streamlit:
+# Option B: Fetch fresh data via scrapers -> ingest -> launch Streamlit:
 ./bin/run.sh --crawl
 
-# Cào + chạy 8 MapReduce jobs + Streamlit:
+# Option C: Full pipeline (Crawl -> Ingest -> Execute 8 MapReduce jobs -> Streamlit):
 ./bin/run.sh --crawl --jobs
 ```
 
-Mở trình duyệt Windows tại: **http://localhost:8501**
+Once started, access the web UI from your browser at: **`http://localhost:8501`**
 
-### Bước 4: Dừng dịch vụ
+### 4. Stop Services & Teardown
+
+To shut down running background daemons (Hadoop NameNode/DataNode, HiveServer2, MySQL, MongoDB):
 
 ```bash
-./bin/stop.sh                   # Dừng tất cả
-./bin/stop.sh --backup          # Backup trước khi dừng
-./bin/stop.sh --cleandata       # Wipe data (demo reset)
+./bin/stop.sh                   # Standard graceful shutdown
+./bin/stop.sh --backup          # Take logical backup before stopping
+./bin/stop.sh --cleandata       # Shutdown and wipe data (resets environment for testing)
 ```
 
 ---
 
-## 6. MapReduce Jobs (8 jobs)
+## MapReduce Analytics Jobs
 
-| Job | Input | Mô tả |
-|-----|-------|-------|
-| `mr_rating_by_district.py` | restaurants.jsonl | Rating trung bình theo quận (extract từ địa chỉ) |
-| `mr_cuisine_count.py` | meals.jsonl | Tần suất danh mục & vùng ẩm thực (TheMealDB) |
-| `mr_rating_bucket.py` | restaurants.jsonl | Phân nhóm nhà hàng theo rating (1-2 / 2-3 / 3-4 / 4-5 sao) |
-| `mr_sentiment_analysis.py` | restaurants.jsonl | Sentiment score từ review comments |
-| `mr_ingredient_match.py` | restaurants.jsonl | Nguyên liệu được đề cập trong review (kết nối TheMealDB) |
-| `mr_top_reviewed.py` | restaurants.jsonl | Top 10 nhà hàng được review nhiều nhất |
-| `mr_review_distribution.py` | restaurants.jsonl | Phân phối sao đánh giá (1→5 sao) |
-| `mr_delivery_analysis.py` | restaurants.jsonl | So sánh rating: đề cập delivery vs dine-in |
+The system features 8 independent Python MapReduce jobs powered by `mrjob` running over Hadoop Streaming:
 
----
-
-## 7. Hive Analytics Views (7 views)
-
-| View | Mô tả |
-|------|-------|
-| `view_rating_by_district` | Avg rating + số nhà hàng theo quận (dùng `district_parsed`) |
-| `view_cuisine_frequency` | Phân bố danh mục ẩm thực từ TheMealDB |
-| `view_cuisine_area` | Phân bố vùng ẩm thực từ TheMealDB |
-| `view_top_districts` | Top quận theo số lượng nhà hàng |
-| `view_rating_histogram` | Phân bố nhà hàng theo nhóm rating |
-| `view_review_distribution` | Phân phối sao trong reviews |
-| `view_delivery_sentiment` | Delivery-mentioned vs dine-in avg rating |
+| Job Module | Primary Input | Description |
+| :--- | :--- | :--- |
+| `mr_rating_by_district.py` | `restaurants.jsonl` | Computes average restaurant star ratings per parsed urban district |
+| `mr_cuisine_count.py` | `meals.jsonl` | Aggregates category and cuisine area frequencies from recipe data |
+| `mr_rating_bucket.py` | `restaurants.jsonl` | Groups restaurants into rating buckets (`1-2`, `2-3`, `3-4`, `4-5` stars) |
+| `mr_sentiment_analysis.py` | `restaurants.jsonl` | Evaluates sentiment scores from review text per restaurant |
+| `mr_ingredient_match.py` | `restaurants.jsonl` | Matches recipe ingredients against customer reviews to determine ingredient popularity |
+| `mr_top_reviewed.py` | `restaurants.jsonl` | Ranks top 10 most-reviewed culinary establishments |
+| `mr_review_distribution.py` | `restaurants.jsonl` | Analyzes star rating distribution across individual user reviews |
+| `mr_delivery_analysis.py` | `restaurants.jsonl` | Compares average ratings between delivery-related reviews vs. dine-in reviews |
 
 ---
 
-## 8. Troubleshooting nhanh
+## Apache Hive Analytics Views
 
-| Lỗi | Giải pháp |
-|-----|-----------|
-| Java không phải 1.8 | `sudo update-alternatives --config java` → chọn Java 8 |
-| Hive `NoSuchFieldException: parentOffset` | Kiểm tra JAVA_HOME trỏ đúng Java 8 |
-| MySQL `Access denied` | Chạy lại `./bin/install_infra.sh` để reset password |
-| HDFS NameNode không start | `hdfs namenode -format -force` rồi start lại |
-| Streamlit import error | `source venv/bin/activate` rồi `pip install -r requirements.txt` |
+Hive external tables map directly to HDFS datasets, presenting 7 pre-computed OLAP views:
 
-Xem chi tiết: [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md)
+| View Name | Analytics Focus |
+| :--- | :--- |
+| `view_rating_by_district` | District-level average rating and total restaurant density |
+| `view_cuisine_frequency` | Distribution of recipe categories from TheMealDB |
+| `view_cuisine_area` | Geographic origin breakdown of culinary dishes |
+| `view_top_districts` | Ranking of districts by restaurant concentration |
+| `view_rating_histogram` | Macro-level distribution of restaurant rating brackets |
+| `view_review_distribution` | Granular review rating breakdown (1 to 5 stars) |
+| `view_delivery_sentiment` | Comparative sentiment rating between food delivery and dine-in reviews |
+
+---
+
+## Contributors & Git Commit Tracking
+
+Contributions tracked directly from the repository's Git commit history:
+
+| Contributor | Git Profile / Email | Commits | Key Technical Contributions |
+| :--- | :--- | :---: | :--- |
+| **Đỗ Kiến Hưng** | [`@darktheDE`](https://github.com/darktheDE)<br>`kienhung.do1105@gmail.com` | **36** | • **System Architecture & Orchestration**: Designed hybrid OLTP/OLAP architecture and wrote execution lifecycle scripts (`install_infra.sh`, `run.sh`, `stop.sh`).<br>• **Big Data Infrastructure**: Configured Hadoop 3.3.6 (HDFS/YARN) and Hive 3.1.3 metastore with Java 8 runtime compatibility.<br>• **Data Pipelines & ETL**: Built MySQL/MongoDB-to-HDFS export tools, Hive schemas, and OLAP analytics SQL views.<br>• **MapReduce Analytics Engine**: Authored 8 Python `mrjob` batch jobs and batch execution runner (`run_all_jobs.py`).<br>• **Full-Stack Dashboard**: Developed Streamlit UI with MySQL CRUD module, Hive connector module, and backup/restore utilities (`db_backup.sh`, `db_restore.sh`). |
+| **Nguyen Van Quang Duy** | [`@QuangDuyReal`](https://github.com/QuangDuyReal)<br>`fansjaki@gmail.com` | **12** | • **Web Scraping Infrastructure**: Created TripAdvisor Scrapy spider framework (`src/crawler/tripadvisor_job/`) for multi-field restaurant & review crawling.<br>• **REST API Client**: Implemented TheMealDB recipe collector (`src/crawler/fetch_mealdb.py`).<br>• **Crawler Resilience**: Engineered anti-bot mitigation, header rotation, captcha handling, and seed data fallback triggers.<br>• **Data Staging**: Configured initial MongoDB raw data staging layer. |
+
+---
+
+## Documentation & Deep Dives
+
+For further details on configuration, maintenance, and diagnostics, refer to:
+
+- 📖 [**Setup Guide**](SETUP_GUIDE.md) — Comprehensive environment preparation guide.
+- 📖 [**Manual Guide**](MANUAL_GUIDE.md) — Step-by-step user guide for CLI scripts and Web UI.
+- 🏗️ [**Architecture Overview**](docs/ARCHITECTURE.md) — In-depth architectural patterns and flow diagrams.
+- 🛠️ [**Troubleshooting Guide**](docs/TROUBLESHOOTING.md) — Common runtime errors and solution matrix.
+- 🧪 [**Test Plan**](TEST_PLAN.md) — System testing framework and test cases.

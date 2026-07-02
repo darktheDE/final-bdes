@@ -3,7 +3,7 @@
 This document contains a comprehensive record of the commands executed, configuration file contents, and validation outputs for the Base Services Infrastructure Setup (Cycle 0) on Ubuntu 24.04 WSL2.
 
 > [!TIP]
-> All the commands, configurations, and fixes documented here have been automated into a single one-click installer script: [install_infra.sh](file:///d:/Project/final-bdes/bin/install_infra.sh).
+> All the commands, configurations, and fixes documented here have been automated into a single one-click installer script: [install_infra.sh](../../bin/install_infra.sh).
 > You can run `bash bin/install_infra.sh` on any clean Ubuntu 24.04 WSL2 distribution to set up the entire infrastructure automatically.
 
 ---

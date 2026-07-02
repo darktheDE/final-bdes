@@ -130,4 +130,4 @@ streamlit run src/streamlit_app/app.py
 ## 7. Vận Hành Thủ Công (Manual Operations)
 
 Nếu bạn muốn tự chạy từng bước thủ công của pipeline, khởi động dịch vụ riêng lẻ, backup/restore thủ công hoặc truy vấn trực tiếp MySQL, MongoDB, HDFS, Hive bằng CLI để làm nội dung viết báo cáo đồ án, vui lòng tham khảo hướng dẫn chi tiết tại:
-👉 **[MANUAL_GUIDE.md](file:///d:/Project/final-bdes/MANUAL_GUIDE.md)**
+👉 **[MANUAL_GUIDE.md](MANUAL_GUIDE.md)**

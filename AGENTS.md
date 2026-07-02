@@ -10,7 +10,7 @@
 - **Ubuntu 24.04 WSL2 Compatibility**: All generated scripts and configurations must run natively on Ubuntu 24.04 LTS inside WSL2.
   - Never write Windows Batch scripts (`.bat`) for active Linux executions. Use Linux Bash scripts (`.sh`) or Python.
   - Paths must follow POSIX standards (e.g., `/usr/local/hadoop`, `./src/crawler/seed/`). Never use backslashes (`\`) for Linux paths.
-  - When accessing directories shared between Windows and WSL2, map them correctly (e.g., `/mnt/d/Project/final-bdes/`).
+  - When accessing directories shared between Windows and WSL2, map them correctly (e.g., `/mnt/d/Project/...` or relative path `./`).
 - **Python-Only MapReduce**: All MapReduce code must be written in Python using the `mrjob` library executing via Hadoop Streaming.
 - **Robust Ingestion & Fallbacks**: Scraping and API ingestion modules must be offline-tolerant. Always implement a `try-except` fallback block to read from local seed data inside `src/crawler/seed/` if network requests fail or hit rate-limits (HTTP 403/429).
 - **No Personal Identifiers**: Do not include any personal identifiers or usernames (e.g., `kienhung`, `kien_hung`) in scripts, configuration files, paths, or setup commands. All scripts and paths must be generic (e.g., using `$USER`, `$HOME`, or dynamic user detection) to ensure the pipeline runs out-of-the-box on multiple independent machines.
